@@ -1,0 +1,177 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+from choras_fa_adapter.config import AdapterConfig
+from choras_fa_adapter.errors import AdapterError
+from choras_fa_adapter.models import FaRunStatus, MeshInlinePayload
+from choras_fa_adapter.orchestrator import run_from_choras_json
+
+
+class FakeClient:
+    def __init__(self, statuses: list[FaRunStatus]):
+        self._statuses = statuses
+        self._idx = 0
+
+    def submit_run(self, body: dict) -> object:
+        class Submit:
+            run_id = "run-1"
+            correlation_id = "corr-1"
+
+        return Submit()
+
+    def get_run_status(self, run_id: str) -> FaRunStatus:
+        status = self._statuses[self._idx]
+        if self._idx < len(self._statuses) - 1:
+            self._idx += 1
+        return status
+
+    def close(self) -> None:
+        return None
+
+
+@pytest.fixture
+def valid_json(tmp_path: Path) -> Path:
+    msh = tmp_path / "mesh.msh"
+    msh.write_text("dummy", encoding="utf-8")
+    payload = {
+        "msh_path": str(msh),
+        "frequencies": [125, 250, 500],
+        "absorption_coefficients": {"wall": [0.1, 0.2, 0.3]},
+        "simulationSettings": {
+            "fa_c0_mps": 343.0,
+            "fa_rho0_kgpm3": 1.2,
+            "fa_ir_length_s": 1.5,
+            "fa_max_gridstep_cm": 2.0,
+            "fa_freq_limit_hz": 4000.0,
+            "iterations": 100,
+        },
+        "results": [
+            {
+                "sourceX": 2.0,
+                "sourceY": 2.0,
+                "sourceZ": 1.5,
+                "responses": [{"x": 1.0, "y": 1.0, "z": 1.5}],
+            }
+        ],
+    }
+    json_path = tmp_path / "input.json"
+    json_path.write_text(json.dumps(payload), encoding="utf-8")
+    return json_path
+
+
+def _config() -> AdapterConfig:
+    return AdapterConfig(base_url="http://example", token="token")
+
+
+def test_orchestrator_success(
+    monkeypatch: pytest.MonkeyPatch, valid_json: Path
+) -> None:
+    def fake_mesh(_msh_path: str) -> list[MeshInlinePayload]:
+        return [
+            MeshInlinePayload(
+                mesh_id="mesh-0", name="mesh", ply_b64="ZGF0YQ==", decoded_size_bytes=4
+            )
+        ]
+
+    statuses = [
+        FaRunStatus("queued", 0.1, None, None, "corr-1"),
+        FaRunStatus("running", 0.6, None, None, "corr-1"),
+        FaRunStatus("completed", 1.0, {"ok": True}, None, "corr-1"),
+    ]
+
+    monkeypatch.setattr(
+        "choras_fa_adapter.orchestrator.build_inline_mesh_payload", fake_mesh
+    )
+    monkeypatch.setattr(
+        "choras_fa_adapter.orchestrator.extract_required_boundaries",
+        lambda _msh_path: {"wall"},
+    )
+    monkeypatch.setattr(
+        "choras_fa_adapter.orchestrator.FaClient", lambda _cfg: FakeClient(statuses)
+    )
+
+    outcome = run_from_choras_json(str(valid_json), config=_config())
+    assert outcome.status == "completed"
+    assert outcome.run_id == "run-1"
+
+    final_json = json.loads(valid_json.read_text(encoding="utf-8"))
+    assert final_json["results"][0]["percentage"] == 100
+
+
+def test_orchestrator_failed_status(
+    monkeypatch: pytest.MonkeyPatch, valid_json: Path
+) -> None:
+    def fake_mesh(_msh_path: str) -> list[MeshInlinePayload]:
+        return [
+            MeshInlinePayload(
+                mesh_id="mesh-0", name="mesh", ply_b64="ZGF0YQ==", decoded_size_bytes=4
+            )
+        ]
+
+    statuses = [
+        FaRunStatus(
+            "failed",
+            0.2,
+            None,
+            {"detail": "ASYNC worker_execution 500: choras_local_execution_failed: RuntimeError: boom"},
+            "corr-1",
+        )
+    ]
+
+    monkeypatch.setattr(
+        "choras_fa_adapter.orchestrator.build_inline_mesh_payload", fake_mesh
+    )
+    monkeypatch.setattr(
+        "choras_fa_adapter.orchestrator.extract_required_boundaries",
+        lambda _msh_path: {"wall"},
+    )
+    monkeypatch.setattr(
+        "choras_fa_adapter.orchestrator.FaClient", lambda _cfg: FakeClient(statuses)
+    )
+
+    with pytest.raises(AdapterError) as exc:
+        run_from_choras_json(str(valid_json), config=_config())
+
+    assert exc.value.stage == "fa_status_poll"
+    assert (
+        str(exc.value)
+        == "ASYNC worker_execution 500: choras_local_execution_failed: RuntimeError: boom"
+    )
+    final_json = json.loads(valid_json.read_text(encoding="utf-8"))
+    assert "fa_status_poll" in final_json["results"][0]["error"]["message"]
+    assert final_json["results"][0]["error"]["correlation_id"] == "corr-1"
+
+
+def test_orchestrator_missing_required_boundary_absorption(
+    monkeypatch: pytest.MonkeyPatch,
+    valid_json: Path,
+) -> None:
+    def fake_mesh(_msh_path: str) -> list[MeshInlinePayload]:
+        return [
+            MeshInlinePayload(
+                mesh_id="mesh-0",
+                name="mesh",
+                ply_b64="ZGF0YQ==",
+                decoded_size_bytes=4,
+            )
+        ]
+
+    monkeypatch.setattr(
+        "choras_fa_adapter.orchestrator.build_inline_mesh_payload", fake_mesh
+    )
+    monkeypatch.setattr(
+        "choras_fa_adapter.orchestrator.extract_required_boundaries",
+        lambda _msh_path: {"wall", "ceiling"},
+    )
+
+    with pytest.raises(AdapterError) as exc:
+        run_from_choras_json(str(valid_json), config=_config())
+
+    assert exc.value.stage == "material_mapping"
+    final_json = json.loads(valid_json.read_text(encoding="utf-8"))
+    assert "missing absorption entry for boundaries" in (
+        final_json["results"][0]["error"]["message"]
+    )

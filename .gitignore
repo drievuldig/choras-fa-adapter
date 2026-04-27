@@ -1,0 +1,62 @@
+# secrets
+.env
+.env.local
+.env.prod
+
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+.Python
+env/
+venv/
+ENV/
+VENV/
+.venv/
+*.env
+*.env.*
+*.egg-info/
+build/
+dist/
+pip-wheel-metadata/
+
+# VSCode
+.vscode/
+
+# VSCode extensions
+.VSCodeCounter
+
+# macOS
+.DS_Store
+
+# Docker
+*.log
+db_data/
+*.pid
+
+# System
+Thumbs.db
+Desktop.ini
+
+# Test/coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+pytest_cache/
+.pytest_cache/
+.mypy_cache/
+**/.mypy_cache/
+.ruff_cache/
+# Coverage reports (organized in reports/ directory)
+coverage*.xml
+
+# Others
+tmp
+.ci-smoke-venv-local
+
