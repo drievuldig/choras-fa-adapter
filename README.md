@@ -13,7 +13,7 @@ Expected Python version:
 Install pinned adapter version:
 
 ```bash
-python -m pip install "choras-fa-adapter==0.1.0"
+python -m pip install "choras-fa-adapter==0.1.1"
 ```
 
 Required environment variables:
