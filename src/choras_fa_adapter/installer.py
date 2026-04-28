@@ -219,9 +219,11 @@ def {method}_method(json_path: str) -> None:
         run_from_choras_json(str(path), config=config)
     except AdapterError as exc:
         _write_failure(path, f"{{exc.stage}}: {{exc}}")
+        raise
     except Exception as exc:
         _write_failure(path, f"unexpected_error: {{exc}}")
         traceback.print_exc()
+        raise
 
 
 def main() -> None:
@@ -305,7 +307,7 @@ def _render_settings_schema_payload(*, method: str) -> dict[str, object]:  # noq
                 "name": "IR Length",
                 "id": "fa_ir_length_s",
                 "type": "float",
-                "display": "slider",
+                "display": "text",
                 "min": 0.1,
                 "max": 10.0,
                 "default": 1.5,
@@ -327,7 +329,7 @@ def _render_settings_schema_payload(*, method: str) -> dict[str, object]:  # noq
                 "name": "Frequency Limit",
                 "id": "fa_freq_limit_hz",
                 "type": "float",
-                "display": "slider",
+                "display": "text",
                 "min": 500.0,
                 "max": 20000.0,
                 "default": 4000.0,

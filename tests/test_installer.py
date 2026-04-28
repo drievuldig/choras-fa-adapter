@@ -68,6 +68,12 @@ def test_install_interface_writes_files(tmp_path: Path) -> None:
     assert "save_results" in interface_text
     assert "plot_results" in interface_text
     assert "exampleInput_FA.json" in interface_text
+    assert 'except AdapterError as exc:' in interface_text
+    assert (
+        '_write_failure(path, f"{exc.stage}: {exc}")\n        raise'
+        in interface_text
+    )
+    assert 'traceback.print_exc()\n        raise' in interface_text
 
 
 def test_install_interface_import_dedup(tmp_path: Path) -> None:
