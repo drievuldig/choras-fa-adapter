@@ -40,14 +40,12 @@ def run_command(json_path: str) -> None:
 @click.option("--method", default="fa", show_default=True)
 @click.option("--force", is_flag=True, default=False)
 @click.option("--dry-run", is_flag=True, default=False)
-@click.option("--backup/--no-backup", default=True, show_default=True)
 @click.option("--json-logs", is_flag=True, default=False)
 def install_interface_command(
     target: Path,
     method: str,
     force: bool,
     dry_run: bool,
-    backup: bool,
     json_logs: bool,
 ) -> None:
     """Install or update the CHORAS-required interface file."""
@@ -56,7 +54,6 @@ def install_interface_command(
         method=method,
         force=force,
         dry_run=dry_run,
-        backup=backup,
         json_logs=json_logs,
     )
 
@@ -84,14 +81,12 @@ def install_interface_command(
 @click.option("--method", default="fa", show_default=True)
 @click.option("--force", is_flag=True, default=False)
 @click.option("--dry-run", is_flag=True, default=False)
-@click.option("--backup/--no-backup", default=True, show_default=True)
 @click.option("--json-logs", is_flag=True, default=False)
 def install_settings_boilerplate_command(
     target: Path,
     method: str,
     force: bool,
     dry_run: bool,
-    backup: bool,
     json_logs: bool,
 ) -> None:
     """Install CHORAS settings schema + registration boilerplate for FA."""
@@ -100,7 +95,6 @@ def install_settings_boilerplate_command(
         method=method,
         force=force,
         dry_run=dry_run,
-        backup=backup,
         json_logs=json_logs,
     )
 

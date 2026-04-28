@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import shutil
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -23,7 +22,6 @@ def install_settings_boilerplate(
     method: str,
     force: bool,
     dry_run: bool,
-    backup: bool,
     json_logs: bool = False,
 ) -> InstallResult:
     messages: list[str] = []
@@ -70,14 +68,6 @@ def install_settings_boilerplate(
     try:
         example_settings_dir.mkdir(parents=False, exist_ok=True)
 
-        for path in existing:
-            if backup:
-                backup_path = path.with_suffix(
-                    path.suffix + f".bak.{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
-                )
-                shutil.copy2(path, backup_path)
-                messages.append(f"created backup: {backup_path}")
-
         schema_path.write_text(
             json.dumps(schema_payload, indent=2) + "\n", encoding="utf-8"
         )
@@ -103,7 +93,6 @@ def install_interface(
     method: str,
     force: bool,
     dry_run: bool,
-    backup: bool,
     json_logs: bool = False,
 ) -> InstallResult:
     messages: list[str] = []
@@ -155,14 +144,6 @@ def install_interface(
         )
 
     try:
-        if interface_path.exists() and backup:
-            backup_path = interface_path.with_suffix(
-                interface_path.suffix
-                + f".bak.{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
-            )
-            shutil.copy2(interface_path, backup_path)
-            messages.append(f"created backup: {backup_path}")
-
         interface_path.write_text(rendered, encoding="utf-8")
         messages.append(f"wrote {interface_path}")
 

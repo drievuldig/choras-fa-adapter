@@ -15,7 +15,6 @@ def test_install_interface_dry_run(tmp_path: Path) -> None:
         method="fa",
         force=False,
         dry_run=True,
-        backup=True,
     )
 
     assert result.success is True
@@ -31,7 +30,6 @@ def test_install_interface_missing_sim_pkg_dir(tmp_path: Path) -> None:
         method="fa",
         force=False,
         dry_run=False,
-        backup=False,
     )
 
     assert result.success is False
@@ -48,7 +46,6 @@ def test_install_interface_writes_files(tmp_path: Path) -> None:
         method="fa",
         force=False,
         dry_run=False,
-        backup=True,
     )
 
     interface_path = sim_pkg / "FAinterface.py"
@@ -85,7 +82,6 @@ def test_install_interface_import_dedup(tmp_path: Path) -> None:
         method="fa",
         force=False,
         dry_run=False,
-        backup=True,
     )
     assert first.success is True
 
@@ -94,7 +90,6 @@ def test_install_interface_import_dedup(tmp_path: Path) -> None:
         method="fa",
         force=True,
         dry_run=False,
-        backup=False,
     )
     assert second.success is True
 
@@ -108,7 +103,6 @@ def test_install_settings_boilerplate_dry_run(tmp_path: Path) -> None:
         method="fa",
         force=False,
         dry_run=True,
-        backup=True,
     )
 
     assert result.success is True
@@ -124,7 +118,6 @@ def test_install_settings_boilerplate_writes_schema_and_snippet(tmp_path: Path) 
         method="fa",
         force=False,
         dry_run=False,
-        backup=True,
     )
 
     schema_path = tmp_path / "example_settings" / "fa_setting.json"
