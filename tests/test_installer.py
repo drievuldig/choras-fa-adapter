@@ -108,6 +108,7 @@ def test_install_settings_boilerplate_dry_run(tmp_path: Path) -> None:
     assert result.success is True
     assert result.exit_code == 0
     assert any("dry-run" in line for line in result.messages)
+    assert any("TaskType update required" in line for line in result.messages)
     assert not (tmp_path / "example_settings" / "fa_setting.json").exists()
 
 
@@ -122,13 +123,12 @@ def test_install_settings_boilerplate_writes_schema_and_snippet(tmp_path: Path) 
 
     schema_path = tmp_path / "example_settings" / "fa_setting.json"
     registry_path = tmp_path / "FA_simulation_settings_registration.snippet.json"
-    tasktype_path = tmp_path / "FA_task_type.snippet.txt"
 
     assert result.success is True
     assert result.exit_code == 0
     assert schema_path.exists()
     assert registry_path.exists()
-    assert tasktype_path.exists()
+    assert any("TaskType update required" in line for line in result.messages)
 
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
     assert schema["type"] == "simulationSettings"
@@ -150,6 +150,4 @@ def test_install_settings_boilerplate_writes_schema_and_snippet(tmp_path: Path) 
     for field in required_fields:
         assert field in registry, f"registry missing field {field!r}"
 
-    tasktype_text = tasktype_path.read_text(encoding="utf-8")
-    assert 'FA = "FA"' in tasktype_text
-    assert "TaskType" in tasktype_text
+    assert any('FA = "FA"' in line for line in result.messages)

@@ -45,23 +45,20 @@ def install_settings_boilerplate(
     registry_path = (  # noqa: E501
         target / f"{method_upper}_simulation_settings_registration.snippet.json"
     )
-    tasktype_path = target / f"{method_upper}_task_type.snippet.txt"
 
     schema_payload = _render_settings_schema_payload(method=method)
     registry_payload = _render_settings_registry_entry(method=method)
-    tasktype_text = _render_task_type_snippet(method=method)
 
     messages.append(f"target UI schema: {schema_path}")
     messages.append(f"target registry snippet: {registry_path}")
-    messages.append(f"target TaskType snippet: {tasktype_path}")
+    messages.append("TaskType update required in app/types/Task.py:")
+    messages.append(f'{method_upper} = "{method_upper}"')
 
     if dry_run:
         messages.append("dry-run: no files written")
         return InstallResult(True, 0, messages)
 
-    existing = [
-        path for path in (schema_path, registry_path, tasktype_path) if path.exists()
-    ]
+    existing = [path for path in (schema_path, registry_path) if path.exists()]
     if existing and not force:
         joined = ", ".join(str(path) for path in existing)
         return InstallResult(
@@ -90,9 +87,6 @@ def install_settings_boilerplate(
             json.dumps(registry_payload, indent=2) + "\n", encoding="utf-8"
         )
         messages.append(f"wrote {registry_path}")
-
-        tasktype_path.write_text(tasktype_text, encoding="utf-8")
-        messages.append(f"wrote {tasktype_path}")
     except OSError as exc:
         err = stage_error("installer", "write failure", cause=exc)
         return InstallResult(False, 3, messages + [f"{err.stage}: {err}"])
