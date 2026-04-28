@@ -30,9 +30,22 @@ def install_interface(
 
     method_upper = method.upper()
 
+    # The interface lives in the Python package inside the CHORAS backend:
+    #   <backend>/simulation-backend/simulation_backend/
+    sim_pkg_dir = target / "simulation-backend" / "simulation_backend"
+    if not sim_pkg_dir.exists() or not sim_pkg_dir.is_dir():
+        return InstallResult(
+            False,
+            2,
+            [
+                f"simulation package directory not found: {sim_pkg_dir}",
+                "expected layout: <backend>/simulation-backend/simulation_backend/",
+            ],
+        )
+
     interface_filename = f"{method_upper}interface.py"
-    interface_path = target / interface_filename
-    init_path = target / "__init__.py"
+    interface_path = sim_pkg_dir / interface_filename
+    init_path = sim_pkg_dir / "__init__.py"
 
     rendered = _render_interface_template(method=method)
     import_line = f"from .{method_upper}interface import {method}_method"

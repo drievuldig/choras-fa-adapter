@@ -41,7 +41,7 @@ def install_settings_boilerplate(
     method_upper = method.upper()
 
     example_settings_dir = target / "example_settings"
-    schema_path = example_settings_dir / f"{method_upper}.json"
+    schema_path = example_settings_dir / f"{method}_setting.json"
     registry_path = (  # noqa: E501
         target / f"{method_upper}_simulation_settings_registration.snippet.json"
     )
@@ -126,8 +126,21 @@ def install_interface(
 
     method_upper = method.upper()
 
-    interface_path = target / f"{method_upper}interface.py"
-    init_path = target / "__init__.py"
+    # The interface lives in the Python package inside the CHORAS backend:
+    #   <backend>/simulation-backend/simulation_backend/
+    sim_pkg_dir = target / "simulation-backend" / "simulation_backend"
+    if not sim_pkg_dir.exists() or not sim_pkg_dir.is_dir():
+        return InstallResult(
+            False,
+            2,
+            [
+                f"simulation package directory not found: {sim_pkg_dir}",
+                "expected layout: <backend>/simulation-backend/simulation_backend/",
+            ],
+        )
+
+    interface_path = sim_pkg_dir / f"{method_upper}interface.py"
+    init_path = sim_pkg_dir / "__init__.py"
 
     rendered = _render_interface_template(method=method)
     import_line = f"from .{method_upper}interface import {method}_method"
@@ -337,7 +350,7 @@ def _render_settings_registry_entry(*, method: str) -> dict[str, object]:
     return {
         "description": "Finite-difference time-domain room acoustics simulation via FA",
         "label": f"Finite-Difference Time-Domain for Room Acoustics ({method_upper})",
-        "name": f"{method_upper}.json",
+        "name": f"{method}_setting.json",
         "simulationType": method_upper,
         "repositoryURL": "https://github.com/drievuldig/choras-fa-adapter",
         "documentationURL": "https://github.com/drievuldig/choras-fa-adapter#readme",

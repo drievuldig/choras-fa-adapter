@@ -7,6 +7,9 @@ from choras_fa_adapter.installer import install_interface, install_settings_boil
 
 
 def test_install_interface_dry_run(tmp_path: Path) -> None:
+    sim_pkg = tmp_path / "simulation-backend" / "simulation_backend"
+    sim_pkg.mkdir(parents=True)
+
     result = install_interface(
         target=tmp_path,
         method="fa",
@@ -18,10 +21,28 @@ def test_install_interface_dry_run(tmp_path: Path) -> None:
     assert result.success is True
     assert result.exit_code == 0
     assert any("dry-run" in line for line in result.messages)
-    assert not (tmp_path / "FAinterface.py").exists()
+    assert not (sim_pkg / "FAinterface.py").exists()
+
+
+def test_install_interface_missing_sim_pkg_dir(tmp_path: Path) -> None:
+    # target exists but simulation-backend/simulation_backend subdir is absent
+    result = install_interface(
+        target=tmp_path,
+        method="fa",
+        force=False,
+        dry_run=False,
+        backup=False,
+    )
+
+    assert result.success is False
+    assert result.exit_code == 2
+    assert any("simulation package directory not found" in m for m in result.messages)
 
 
 def test_install_interface_writes_files(tmp_path: Path) -> None:
+    sim_pkg = tmp_path / "simulation-backend" / "simulation_backend"
+    sim_pkg.mkdir(parents=True)
+
     result = install_interface(
         target=tmp_path,
         method="fa",
@@ -30,8 +51,8 @@ def test_install_interface_writes_files(tmp_path: Path) -> None:
         backup=True,
     )
 
-    interface_path = tmp_path / "FAinterface.py"
-    init_path = tmp_path / "__init__.py"
+    interface_path = sim_pkg / "FAinterface.py"
+    init_path = sim_pkg / "__init__.py"
 
     assert result.success is True
     assert result.exit_code == 0
@@ -50,6 +71,9 @@ def test_install_interface_writes_files(tmp_path: Path) -> None:
 
 
 def test_install_interface_import_dedup(tmp_path: Path) -> None:
+    sim_pkg = tmp_path / "simulation-backend" / "simulation_backend"
+    sim_pkg.mkdir(parents=True)
+
     first = install_interface(
         target=tmp_path,
         method="fa",
@@ -68,7 +92,7 @@ def test_install_interface_import_dedup(tmp_path: Path) -> None:
     )
     assert second.success is True
 
-    init_text = (tmp_path / "__init__.py").read_text(encoding="utf-8")
+    init_text = (sim_pkg / "__init__.py").read_text(encoding="utf-8")
     assert init_text.count("from .FAinterface import fa_method") == 1
 
 
@@ -84,7 +108,7 @@ def test_install_settings_boilerplate_dry_run(tmp_path: Path) -> None:
     assert result.success is True
     assert result.exit_code == 0
     assert any("dry-run" in line for line in result.messages)
-    assert not (tmp_path / "example_settings" / "FA.json").exists()
+    assert not (tmp_path / "example_settings" / "fa_setting.json").exists()
 
 
 def test_install_settings_boilerplate_writes_schema_and_snippet(tmp_path: Path) -> None:
@@ -96,7 +120,7 @@ def test_install_settings_boilerplate_writes_schema_and_snippet(tmp_path: Path) 
         backup=True,
     )
 
-    schema_path = tmp_path / "example_settings" / "FA.json"
+    schema_path = tmp_path / "example_settings" / "fa_setting.json"
     registry_path = tmp_path / "FA_simulation_settings_registration.snippet.json"
     tasktype_path = tmp_path / "FA_task_type.snippet.txt"
 
@@ -118,7 +142,7 @@ def test_install_settings_boilerplate_writes_schema_and_snippet(tmp_path: Path) 
 
     registry = json.loads(registry_path.read_text(encoding="utf-8"))
     assert registry["simulationType"] == "FA"
-    assert registry["name"] == "FA.json"
+    assert registry["name"] == "fa_setting.json"
     required_fields = (
         "description", "label", "name", "simulationType",
         "repositoryURL", "documentationURL",
