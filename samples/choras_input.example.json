@@ -64,78 +64,58 @@
       0.61
     ]
   },
-  "msh_path": "samples/MeasurementRoom.msh",
+  "msh_path": "MeasurementRoom.msh",
   "simulationSettings": {
     "fa_c0_mps": 343.0,
     "fa_rho0_kgpm3": 1.2,
-    "fa_ir_length_s": 1.5,
+    "fa_ir_length_s": 0.1,
     "fa_max_gridstep_cm": 2.0,
     "fa_freq_limit_hz": 4000.0
   },
-  "results": [
-    {
-      "percentage": 100,
-      "sourceX": 2,
-      "sourceY": 2,
-      "sourceZ": 1.5,
-      "resultType": "DG",
-      "frequencies": [
-        125,
-        250,
-        500,
-        1000,
-        2000
-      ],
-      "responses": [
+    "results": [
         {
-          "x": 1,
-          "y": 1,
-          "z": 1.5,
-          "receiverResults": [],
-          "receiverResultsUncorrected": []
-        },
-        {
-          "x": 0.5,
-          "y": 1,
-          "z": 1.5,
-          "receiverResults": [],
-          "receiverResultsUncorrected": []
-        },
-        {
-          "x": 1,
-          "y": 2,
-          "z": 0.5,
-          "receiverResults": [],
-          "receiverResultsUncorrected": []
-        },
-        {
-          "x": 0.5,
-          "y": 0.5,
-          "z": 0.5,
-          "receiverResults": [],
-          "receiverResultsUncorrected": []
+            "percentage": 100,
+            "sourceX": 2,
+            "sourceY": 2,
+            "sourceZ": 1.5,
+            "resultType": "FA",
+            "frequencies": [
+                125,
+                250,
+                500,
+                1000,
+                2000
+            ],
+            "responses": [
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1.5,
+                    "receiverResults": [],
+                    "receiverResultsUncorrected": []
+                },
+                {
+                    "x": 0.5,
+                    "y": 1,
+                    "z": 1.5,
+                    "receiverResults": [],
+                    "receiverResultsUncorrected": []
+                },
+                {
+                    "x": 1,
+                    "y": 2,
+                    "z": 0.5,
+                    "receiverResults": [],
+                    "receiverResultsUncorrected": []
+                },
+                {
+                    "x": 0.5,
+                    "y": 0.5,
+                    "z": 0.5,
+                    "receiverResults": [],
+                    "receiverResultsUncorrected": []
+                }
+            ]
         }
-      ],
-      "error": {
-        "message": "fa_status_poll: backend failure",
-        "correlation_id": "9bdb8511-378b-4ba2-ae2a-5bca670a7620"
-      },
-      "result": {
-        "mode": "local",
-        "status": "completed",
-        "worker": {
-          "mode": "local",
-          "status": "completed",
-          "metrics": {
-            "source_cutoff_frequency_hz": 2986.1564504159223
-          },
-          "raw_bytes": 778116,
-          "processed_bytes": 2367796,
-          "submitted_source_count": 1,
-          "submitted_receiver_count": 4
-        },
-        "completed_at": "2026-04-27T23:31:31.010355+00:00"
-      }
-    }
-  ]
+    ]
 }
