@@ -41,6 +41,13 @@ def test_install_interface_writes_files(tmp_path: Path) -> None:
     init_text = init_path.read_text(encoding="utf-8")
     assert "from .FAinterface import fa_method" in init_text
 
+    interface_text = interface_path.read_text(encoding="utf-8")
+    assert "find_input_file_in_subfolders" in interface_text
+    assert "create_tmp_from_input" in interface_text
+    assert "save_results" in interface_text
+    assert "plot_results" in interface_text
+    assert "exampleInput_FA.json" in interface_text
+
 
 def test_install_interface_import_dedup(tmp_path: Path) -> None:
     first = install_interface(

@@ -186,6 +186,7 @@ def install_interface(
 def _render_interface_template(*, method: str) -> str:
     timestamp = datetime.now(UTC).isoformat()
     version = __version__
+    method_upper = method.upper()
     return f'''from __future__ import annotations
 
 # generated-by: choras-fa-adapter
@@ -245,7 +246,24 @@ def _write_failure(path: Path, message: str) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    import os
+
+    from simulation_backend import (
+        create_tmp_from_input,
+        find_input_file_in_subfolders,
+        plot_results,
+        save_results,
+    )
+
+    json_file_name = find_input_file_in_subfolders(
+        os.path.dirname(__file__), "exampleInput_{method_upper}.json"
+    )
+    json_tmp_file = create_tmp_from_input(json_file_name)
+
+    {method}_method(json_tmp_file)
+
+    save_results(json_tmp_file)
+    plot_results(json_tmp_file)
 '''
 
 
