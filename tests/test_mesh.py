@@ -134,3 +134,31 @@ def test_resolve_materials_drops_bands_above_16000_hz() -> None:
         "8000",
         "16000",
     }
+
+
+def test_resolve_materials_accepts_csv_absorption_and_result_frequencies() -> None:
+    data = {
+        "results": [{"frequencies": [125, 250, 500]}],
+        "absorption_coefficients": {
+            "wall": "0.1, 0.2, 0.3",
+        },
+    }
+
+    materials, _ = resolve_materials(data, required_boundaries={"wall"})
+    coeffs = materials[0]["absorption_coefficients"]
+    assert coeffs == {"125": 0.1, "250": 0.2, "500": 0.3}
+
+
+def test_resolve_materials_rejects_bad_csv_absorption() -> None:
+    data = {
+        "results": [{"frequencies": [125, 250, 500]}],
+        "absorption_coefficients": {
+            "wall": "0.1, bad, 0.3",
+        },
+    }
+
+    with pytest.raises(AdapterError) as exc:
+        resolve_materials(data, required_boundaries={"wall"})
+
+    assert exc.value.stage == "material_mapping"
+    assert "invalid absorption coefficient value" in str(exc.value)

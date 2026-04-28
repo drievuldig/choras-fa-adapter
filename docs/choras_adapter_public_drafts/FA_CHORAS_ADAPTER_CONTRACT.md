@@ -56,15 +56,15 @@ Responsibilities:
 Required source fields:
 
 - msh_path
-- absorption_coefficients (keyed by boundary/physical-group name)
-- simulation_settings (mixed physical constants and simulation-control
-  limits)
+- absorption_coefficients (keyed by boundary/physical-group name; each value may
+  be a CSV string like "0.6, 0.69, 0.71" or a numeric vector)
 - simulationSettings
-- results list (includes source/receiver definitions)
+- results list (includes source/receiver definitions and frequency bands under
+  results[*].frequencies)
 - should_cancel (optional)
 - task_id (optional)
 
-`simulation_settings` fields expected by FA:
+`simulationSettings` fields expected by FA:
 
 - fa_c0_mps: wavespeed in air (m/s)
 - fa_rho0_kgpm3: air density (kg/m^3)
@@ -75,7 +75,7 @@ Required source fields:
 Adapter must fail fast on:
 
 - missing msh_path
-- missing or malformed simulation_settings fields
+- missing or malformed simulationSettings fields
 - unresolved physical groups
 - missing absorption entry for a required boundary
 - malformed absorption vectors
@@ -89,7 +89,8 @@ Endpoint:
 
 Body:
 
-- simulation_settings (physical constants and simulation-control limits)
+- simulation_settings (physical constants and simulation-control limits; mapped
+  from CHORAS input key simulationSettings)
 - payload
   - sources
   - receivers

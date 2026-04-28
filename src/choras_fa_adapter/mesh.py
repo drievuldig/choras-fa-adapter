@@ -33,6 +33,15 @@ def _to_absorption_coefficients(
     frequencies: list[int | float] | None,
     boundary: str,
 ) -> dict[str, float]:
+    if isinstance(raw_value, str):
+        parts = [part.strip() for part in raw_value.split(",") if part.strip()]
+        if not parts:
+            raise stage_error(
+                "material_mapping",
+                f"invalid absorption vector for {boundary}",
+            )
+        raw_value = parts
+
     if isinstance(raw_value, dict) and raw_value:
         out: dict[str, float] = {}
         for key, coeff in raw_value.items():
@@ -89,12 +98,20 @@ def _to_absorption_coefficients(
                 )
             if not _is_supported_band(freq):
                 continue
-            if not isinstance(coeff, int | float):
+            if not isinstance(coeff, int | float | str):
                 raise stage_error(
                     "material_mapping",
                     f"invalid absorption coefficient value for {boundary}",
                 )
-            out[_normalize_frequency_key(freq)] = float(coeff)
+            try:
+                parsed_coeff = float(coeff)
+            except (TypeError, ValueError) as exc:
+                raise stage_error(
+                    "material_mapping",
+                    f"invalid absorption coefficient value for {boundary}",
+                    cause=exc,
+                ) from exc
+            out[_normalize_frequency_key(freq)] = parsed_coeff
         if not out:
             raise stage_error(
                 "material_mapping",
@@ -103,6 +120,23 @@ def _to_absorption_coefficients(
         return out
 
     raise stage_error("material_mapping", f"invalid absorption vector for {boundary}")
+
+
+def _extract_frequencies(data: dict[str, Any]) -> list[int | float] | None:
+    raw_frequencies = data.get("frequencies")
+    if isinstance(raw_frequencies, list) and raw_frequencies:
+        return raw_frequencies
+
+    results = data.get("results")
+    if isinstance(results, list):
+        for item in results:
+            if not isinstance(item, dict):
+                continue
+            item_frequencies = item.get("frequencies")
+            if isinstance(item_frequencies, list) and item_frequencies:
+                return item_frequencies
+
+    return None
 
 
 def extract_required_boundaries(msh_path: str) -> set[str]:
@@ -204,8 +238,7 @@ def resolve_materials(
     required_boundaries: set[str] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     coeffs = data.get("absorption_coefficients")
-    raw_frequencies = data.get("frequencies")
-    frequencies = raw_frequencies if isinstance(raw_frequencies, list) else None
+    frequencies = _extract_frequencies(data)
     if not isinstance(coeffs, dict) or not coeffs:
         raise stage_error(
             "material_mapping", "absorption_coefficients missing or empty"

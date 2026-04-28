@@ -42,6 +42,58 @@ _SIM_SETTINGS_RANGES: dict[str, tuple[float | None, float | None, bool]] = {
 }
 
 
+def _parse_absorption_values(raw: Any, *, boundary: str) -> list[float]:
+    if isinstance(raw, list):
+        values = raw
+    elif isinstance(raw, dict):
+        values = list(raw.values())
+    elif isinstance(raw, str):
+        parts = [part.strip() for part in raw.split(",") if part.strip()]
+        if not parts:
+            raise stage_error(
+                "input_validation",
+                f"absorption for {boundary} must be a non-empty list or CSV string",
+            )
+        values = parts
+    else:
+        raise stage_error(
+            "input_validation",
+            f"absorption for {boundary} must be a list, object, or CSV string",
+        )
+
+    if not values:
+        raise stage_error(
+            "input_validation",
+            f"absorption for {boundary} must be a non-empty list or CSV string",
+        )
+
+    parsed: list[float] = []
+    for entry in values:
+        if isinstance(entry, str):
+            entry = entry.strip()
+            if not entry:
+                raise stage_error(
+                    "input_validation",
+                    f"absorption for {boundary} has empty value",
+                )
+        if not isinstance(entry, int | float | str):
+            raise stage_error(
+                "input_validation",
+                f"absorption for {boundary} has non-numeric value",
+            )
+        try:
+            value = float(entry)
+        except (TypeError, ValueError) as exc:
+            raise stage_error(
+                "input_validation",
+                f"absorption for {boundary} has non-numeric value",
+                cause=exc,
+            ) from exc
+        parsed.append(value)
+
+    return parsed
+
+
 def validate_input(data: dict[str, Any]) -> None:
     missing = [key for key in REQUIRED_SIM_FIELDS if key not in data]
     if missing:
@@ -102,17 +154,8 @@ def validate_input(data: dict[str, Any]) -> None:
             raise stage_error(
                 "input_validation", "absorption boundary keys must be strings"
             )
-        if not isinstance(vec, list) or not vec:
-            raise stage_error(
-                "input_validation",
-                f"absorption for {boundary} must be a non-empty list",
-            )
-        for entry in vec:
-            if not isinstance(entry, int | float):
-                raise stage_error(
-                    "input_validation",
-                    f"absorption for {boundary} has non-numeric value",
-                )
+        parsed_values = _parse_absorption_values(vec, boundary=boundary)
+        for entry in parsed_values:
             if entry < 0 or entry > 1:
                 raise stage_error(
                     "input_validation", f"absorption for {boundary} out of range [0,1]"

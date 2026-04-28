@@ -58,6 +58,24 @@ def test_validate_input_invalid_absorption_value(tmp_path: Path) -> None:
     assert "out of range" in str(exc.value)
 
 
+def test_validate_input_accepts_absorption_csv_string(tmp_path: Path) -> None:
+    data = _valid_input(tmp_path)
+    data["absorption_coefficients"]["wall"] = "0.1, 0.2, 0.3"
+
+    validate_input(data)
+
+
+def test_validate_input_rejects_invalid_absorption_csv_string(tmp_path: Path) -> None:
+    data = _valid_input(tmp_path)
+    data["absorption_coefficients"]["wall"] = "0.1, not-a-number, 0.3"
+
+    with pytest.raises(AdapterError) as exc:
+        validate_input(data)
+
+    assert exc.value.stage == "input_validation"
+    assert "non-numeric value" in str(exc.value)
+
+
 def test_validate_input_missing_simulation_param_field(tmp_path: Path) -> None:
     data = _valid_input(tmp_path)
     del data["simulationSettings"]["fa_freq_limit_hz"]
