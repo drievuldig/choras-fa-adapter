@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from .choras_io import load_choras_json
@@ -15,11 +16,14 @@ from .models import AdapterOutcome
 from .payload_builder import build_submit_body
 from .validation import validate_input
 
+logger = logging.getLogger(__name__)
+
 
 def _progress_from_status(progress: float | None) -> int:
     if progress is None:
-        return 40
-    return max(40, min(95, round(float(progress) * 100)))
+        return 3
+    # Reserve [0,1,2] for local adapter phases and [100] for terminal success.
+    return max(3, min(99, 3 + round(float(progress) * 96)))
 
 
 def run_from_choras_json(json_path: str, *, config: AdapterConfig) -> AdapterOutcome:
@@ -28,11 +32,11 @@ def run_from_choras_json(json_path: str, *, config: AdapterConfig) -> AdapterOut
     last_correlation_id: str | None = None
 
     try:
-        choras.set_percentage(5)
+        choras.set_percentage(0)
         choras.persist()
 
         validate_input(data)
-        choras.set_percentage(15)
+        choras.set_percentage(1)
         choras.persist()
 
         if data.get("should_cancel"):
@@ -46,7 +50,7 @@ def run_from_choras_json(json_path: str, *, config: AdapterConfig) -> AdapterOut
             required_boundaries=required_boundaries,
         )
 
-        choras.set_percentage(30)
+        choras.set_percentage(2)
         choras.persist()
 
         body = build_submit_body(
@@ -56,7 +60,7 @@ def run_from_choras_json(json_path: str, *, config: AdapterConfig) -> AdapterOut
             mesh_bindings=mesh_bindings,
         )
 
-        choras.set_percentage(40)
+        choras.set_percentage(3)
         choras.persist()
 
         client = FaClient(config)
@@ -67,6 +71,14 @@ def run_from_choras_json(json_path: str, *, config: AdapterConfig) -> AdapterOut
 
             while status.status in {"queued", "running"}:
                 last_correlation_id = status.correlation_id or last_correlation_id
+                if config.log_poll_status:
+                    logger.info(
+                        "poll run_id=%s status=%s progress=%s correlation_id=%s",
+                        submit.run_id,
+                        status.status,
+                        status.progress,
+                        last_correlation_id,
+                    )
                 choras.set_percentage(_progress_from_status(status.progress))
                 choras.persist()
                 status = client.get_run_status(submit.run_id)

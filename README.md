@@ -54,6 +54,12 @@ choras-fa-adapter run --json /path/to/input.json
 choras-fa-adapter install-interface --target /path/to/simulation_backend --method fa
 ```
 
+4. Install CHORAS settings-schema boilerplate for UI wiring:
+
+```bash
+choras-fa-adapter install-settings-boilerplate --target /path/to/simulation_backend --method fa
+```
+
 ## Sample Input
 
 A ready-to-edit CHORAS JSON example is available at `samples/choras_input.example.json`.
@@ -87,6 +93,7 @@ The adapter reads config from environment variables:
 - `CHORAS_FA_POLL_INTERVAL_SECONDS` (default `2`)
 - `CHORAS_FA_MAX_POLLS` (default `300`)
 - `CHORAS_FA_ENABLE_CAPABILITY_PROBE` (default `false`)
+- `CHORAS_FA_LOG_POLL_STATUS` (default `false`; logs each polled status/progress pair)
 
 ## Error stages
 
@@ -100,6 +107,16 @@ Errors are stage-prefixed:
 - `result_writeback`
 - `installer`
 - `environment`
+
+## Progress phase mapping
+
+Adapter writes CHORAS results percentage using this phase model:
+
+- 0-1: parse/validate input
+- 1-2: msh conversion + material mapping
+- 2-3: FA submit
+- 3-99: poll running
+- 100: completed
 
 ## Development
 

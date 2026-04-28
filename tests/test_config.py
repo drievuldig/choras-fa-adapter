@@ -156,6 +156,23 @@ def test_load_config_default_auth_refresh_and_token_mode(
     config = load_config()
     assert config.auth_refresh_path == "/auth/refresh"
     assert config.token_mode == "auto"
+    assert config.log_poll_status is False
+
+
+def test_load_config_enables_poll_status_logging(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    creds = tmp_path / "credentials"
+    creds.write_text("token=abc\n", encoding="utf-8")
+
+    _set_base_url(monkeypatch)
+    _clear_token_env(monkeypatch)
+    monkeypatch.setenv("CHORAS_FA_CREDENTIALS_FILE", str(creds))
+    monkeypatch.setenv("CHORAS_FA_LOG_POLL_STATUS", "true")
+
+    config = load_config()
+    assert config.log_poll_status is True
 
 
 def test_load_config_invalid_token_mode_fails(

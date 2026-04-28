@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shutil
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -14,6 +15,92 @@ class InstallResult:
     success: bool
     exit_code: int
     messages: list[str]
+
+
+def install_settings_boilerplate(
+    *,
+    target: Path,
+    method: str,
+    force: bool,
+    dry_run: bool,
+    backup: bool,
+    json_logs: bool = False,
+) -> InstallResult:
+    messages: list[str] = []
+
+    if not target.exists() or not target.is_dir():
+        return InstallResult(False, 2, [f"invalid target directory: {target}"])
+    if not method.isidentifier():
+        return InstallResult(False, 2, [f"invalid method name: {method!r}"])
+
+    try:
+        __import__("choras_fa_adapter")
+    except Exception as exc:
+        return InstallResult(False, 4, [f"environment check failed: {exc}"])
+
+    method_upper = method.upper()
+
+    example_settings_dir = target / "example_settings"
+    schema_path = example_settings_dir / f"{method_upper}.json"
+    registry_path = (  # noqa: E501
+        target / f"{method_upper}_simulation_settings_registration.snippet.json"
+    )
+    tasktype_path = target / f"{method_upper}_task_type.snippet.txt"
+
+    schema_payload = _render_settings_schema_payload(method=method)
+    registry_payload = _render_settings_registry_entry(method=method)
+    tasktype_text = _render_task_type_snippet(method=method)
+
+    messages.append(f"target UI schema: {schema_path}")
+    messages.append(f"target registry snippet: {registry_path}")
+    messages.append(f"target TaskType snippet: {tasktype_path}")
+
+    if dry_run:
+        messages.append("dry-run: no files written")
+        return InstallResult(True, 0, messages)
+
+    existing = [
+        path for path in (schema_path, registry_path, tasktype_path) if path.exists()
+    ]
+    if existing and not force:
+        joined = ", ".join(str(path) for path in existing)
+        return InstallResult(
+            False,
+            3,
+            messages + [f"target files already exist: {joined}; rerun with --force"],
+        )
+
+    try:
+        example_settings_dir.mkdir(parents=False, exist_ok=True)
+
+        for path in existing:
+            if backup:
+                backup_path = path.with_suffix(
+                    path.suffix + f".bak.{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
+                )
+                shutil.copy2(path, backup_path)
+                messages.append(f"created backup: {backup_path}")
+
+        schema_path.write_text(
+            json.dumps(schema_payload, indent=2) + "\n", encoding="utf-8"
+        )
+        messages.append(f"wrote {schema_path}")
+
+        registry_path.write_text(
+            json.dumps(registry_payload, indent=2) + "\n", encoding="utf-8"
+        )
+        messages.append(f"wrote {registry_path}")
+
+        tasktype_path.write_text(tasktype_text, encoding="utf-8")
+        messages.append(f"wrote {tasktype_path}")
+    except OSError as exc:
+        err = stage_error("installer", "write failure", cause=exc)
+        return InstallResult(False, 3, messages + [f"{err.stage}: {err}"])
+
+    if json_logs:
+        messages.append("json logging mode active")
+
+    return InstallResult(True, 0, messages)
 
 
 def install_interface(
@@ -37,11 +124,13 @@ def install_interface(
     except Exception as exc:
         return InstallResult(False, 4, [f"environment check failed: {exc}"])
 
-    interface_path = target / f"{method}interface.py"
+    method_upper = method.upper()
+
+    interface_path = target / f"{method_upper}interface.py"
     init_path = target / "__init__.py"
 
     rendered = _render_interface_template(method=method)
-    import_line = f"from .{method}interface import {method}_method"
+    import_line = f"from .{method_upper}interface import {method}_method"
 
     messages.append(f"target interface file: {interface_path}")
     messages.append(f"target __init__.py: {init_path}")
@@ -158,3 +247,98 @@ def _write_failure(path: Path, message: str) -> None:
 if __name__ == "__main__":
     main()
 '''
+
+
+def _render_settings_schema_payload(*, method: str) -> dict[str, object]:  # noqa: ARG001
+    """Return the CHORAS simulationSettings UI schema read by the frontend."""
+    return {
+        "type": "simulationSettings",
+        "options": [
+            {
+                "name": "Speed of Sound",
+                "id": "fa_c0_mps",
+                "type": "float",
+                "display": "text",
+                "min": 300.0,
+                "max": 400.0,
+                "default": 343.0,
+                "step": 0.1,
+                "endAdornment": "m/s",
+            },
+            {
+                "name": "Air Density",
+                "id": "fa_rho0_kgpm3",
+                "type": "float",
+                "display": "text",
+                "min": 1.1,
+                "max": 1.3,
+                "default": 1.2,
+                "step": 0.01,
+                "endAdornment": "kg/m\u00b3",
+            },
+            {
+                "name": "IR Length",
+                "id": "fa_ir_length_s",
+                "type": "float",
+                "display": "slider",
+                "min": 0.1,
+                "max": 10.0,
+                "default": 1.5,
+                "step": 0.1,
+                "endAdornment": "s",
+            },
+            {
+                "name": "Max Grid Step",
+                "id": "fa_max_gridstep_cm",
+                "type": "float",
+                "display": "text",
+                "min": 1.0,
+                "max": 10.0,
+                "default": 2.0,
+                "step": 0.1,
+                "endAdornment": "cm",
+            },
+            {
+                "name": "Frequency Limit",
+                "id": "fa_freq_limit_hz",
+                "type": "float",
+                "display": "slider",
+                "min": 500.0,
+                "max": 20000.0,
+                "default": 4000.0,
+                "step": 100.0,
+                "endAdornment": "Hz",
+            },
+        ],
+    }
+
+
+def _render_settings_registry_entry(*, method: str) -> dict[str, object]:
+    """Return the entry to paste into simulation_settings.json."""
+    method_upper = method.upper()
+    return {
+        "description": "Finite-difference time-domain room acoustics simulation via FA",
+        "label": f"Finite-Difference Time-Domain for Room Acoustics ({method_upper})",
+        "name": f"{method_upper}.json",
+        "simulationType": method_upper,
+        "repositoryURL": "https://github.com/drievuldig/choras-fa-adapter",
+        "documentationURL": "https://github.com/drievuldig/choras-fa-adapter#readme",
+    }
+
+
+def _render_task_type_snippet(*, method: str) -> str:
+    method_upper = method.upper()
+    timestamp = datetime.now(UTC).isoformat()
+    version = __version__
+    return (
+        f"# generated-by: choras-fa-adapter\n"
+        f"# adapter-version: {version}\n"
+        f"# generated-at: {timestamp}\n"
+        f"#\n"
+        f"# Add the following value to the TaskType enum\n"
+        f"# in app/types/Task.py:\n"
+        f"#\n"
+        f"#   {method_upper} = \"{method_upper}\"\n"
+        f"#\n"
+        f"# The simulationType field in the registry snippet above must match this.\\n"
+    )

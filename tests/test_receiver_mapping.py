@@ -5,7 +5,6 @@ import tempfile
 from pathlib import Path
 
 import pytest
-
 from choras_fa_adapter.choras_io import ChorasJson
 from choras_fa_adapter.errors import AdapterError
 

@@ -20,6 +20,27 @@ REQUIRED_SIMULATION_SETTINGS_FIELDS = {
     "fa_freq_limit_hz",
 }
 
+# Limits accepted by the FA solver.
+CHORAS_MIN_FREQ_LIMIT_HZ = 500.0
+CHORAS_MAX_FREQ_LIMIT_HZ = 20000.0
+CHORAS_MIN_GRIDSTEP_CM = 1.0
+CHORAS_MAX_GRIDSTEP_CM = 10.0
+CHORAS_MIN_C0_MPS = 300.0
+CHORAS_MAX_C0_MPS = 400.0
+CHORAS_MIN_RHO0_KGPM3 = 1.1
+CHORAS_MAX_RHO0_KGPM3 = 1.3
+CHORAS_MIN_IR_LENGTH_S = 0.0  # exclusive lower bound
+CHORAS_MAX_IR_LENGTH_S = 10.0
+
+_SIM_SETTINGS_RANGES: dict[str, tuple[float | None, float | None, bool]] = {
+    # key: (min, max, min_exclusive)
+    "fa_c0_mps": (CHORAS_MIN_C0_MPS, CHORAS_MAX_C0_MPS, False),
+    "fa_rho0_kgpm3": (CHORAS_MIN_RHO0_KGPM3, CHORAS_MAX_RHO0_KGPM3, False),
+    "fa_ir_length_s": (CHORAS_MIN_IR_LENGTH_S, CHORAS_MAX_IR_LENGTH_S, True),
+    "fa_max_gridstep_cm": (CHORAS_MIN_GRIDSTEP_CM, CHORAS_MAX_GRIDSTEP_CM, False),
+    "fa_freq_limit_hz": (CHORAS_MIN_FREQ_LIMIT_HZ, CHORAS_MAX_FREQ_LIMIT_HZ, False),
+}
+
 
 def validate_input(data: dict[str, Any]) -> None:
     missing = [key for key in REQUIRED_SIM_FIELDS if key not in data]
@@ -64,6 +85,16 @@ def validate_input(data: dict[str, Any]) -> None:
             raise stage_error(
                 "input_validation",
                 f"simulationSettings.{key} must be numeric",
+            )
+
+    for key, (lo, hi, lo_exclusive) in _SIM_SETTINGS_RANGES.items():
+        value = float(simulation_settings[key])
+        lo_violated = (value <= lo) if lo_exclusive else (value < lo)  # type: ignore[operator]
+        if lo_violated or (hi is not None and value > hi):
+            op = ">" if lo_exclusive else ">="
+            raise stage_error(
+                "input_validation",
+                f"simulationSettings.{key} must be {op}{lo} and <={hi}, got {value}",
             )
 
     for boundary, vec in coeffs.items():

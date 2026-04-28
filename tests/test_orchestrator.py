@@ -7,7 +7,7 @@ import pytest
 from choras_fa_adapter.config import AdapterConfig
 from choras_fa_adapter.errors import AdapterError
 from choras_fa_adapter.models import FaRunStatus, MeshInlinePayload
-from choras_fa_adapter.orchestrator import run_from_choras_json
+from choras_fa_adapter.orchestrator import _progress_from_status, run_from_choras_json
 
 
 class FakeClient:
@@ -116,7 +116,12 @@ def test_orchestrator_failed_status(
             "failed",
             0.2,
             None,
-            {"detail": "ASYNC worker_execution 500: choras_local_execution_failed: RuntimeError: boom"},
+            {
+                "detail": (
+                    "ASYNC worker_execution 500: "
+                    "choras_local_execution_failed: RuntimeError: boom"
+                )
+            },
             "corr-1",
         )
     ]
@@ -129,16 +134,21 @@ def test_orchestrator_failed_status(
         lambda _msh_path: {"wall"},
     )
     monkeypatch.setattr(
-        "choras_fa_adapter.orchestrator.FaClient", lambda _cfg: FakeClient(statuses)
+        "choras_fa_adapter.orchestrator.FaClient",
+        lambda _cfg: FakeClient(statuses),
     )
 
     with pytest.raises(AdapterError) as exc:
         run_from_choras_json(str(valid_json), config=_config())
 
     assert exc.value.stage == "fa_status_poll"
+    expected_message = (
+        "ASYNC worker_execution 500: "
+        "choras_local_execution_failed: RuntimeError: boom"
+    )
     assert (
         str(exc.value)
-        == "ASYNC worker_execution 500: choras_local_execution_failed: RuntimeError: boom"
+        == expected_message
     )
     final_json = json.loads(valid_json.read_text(encoding="utf-8"))
     assert "fa_status_poll" in final_json["results"][0]["error"]["message"]
@@ -175,3 +185,60 @@ def test_orchestrator_missing_required_boundary_absorption(
     assert "missing absorption entry for boundaries" in (
         final_json["results"][0]["error"]["message"]
     )
+
+
+def test_orchestrator_logs_poll_status_when_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+    valid_json: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    def fake_mesh(_msh_path: str) -> list[MeshInlinePayload]:
+        return [
+            MeshInlinePayload(
+                mesh_id="mesh-0",
+                name="mesh",
+                ply_b64="ZGF0YQ==",
+                decoded_size_bytes=4,
+            )
+        ]
+
+    statuses = [
+        FaRunStatus("queued", None, None, None, "corr-1"),
+        FaRunStatus("running", 0.5, None, None, "corr-1"),
+        FaRunStatus("completed", 1.0, {"ok": True}, None, "corr-1"),
+    ]
+
+    monkeypatch.setattr(
+        "choras_fa_adapter.orchestrator.build_inline_mesh_payload", fake_mesh
+    )
+    monkeypatch.setattr(
+        "choras_fa_adapter.orchestrator.extract_required_boundaries",
+        lambda _msh_path: {"wall"},
+    )
+    monkeypatch.setattr(
+        "choras_fa_adapter.orchestrator.FaClient", lambda _cfg: FakeClient(statuses)
+    )
+
+    with caplog.at_level("INFO", logger="choras_fa_adapter.orchestrator"):
+        run_from_choras_json(
+            str(valid_json),
+            config=AdapterConfig(
+                base_url="http://example",
+                token="token",
+                log_poll_status=True,
+            ),
+        )
+
+    messages = [record.getMessage() for record in caplog.records]
+    assert any("status=queued progress=None" in msg for msg in messages)
+    assert any("status=running progress=0.5" in msg for msg in messages)
+
+
+def test_progress_from_status_phase_floor_and_ceiling() -> None:
+    assert _progress_from_status(None) == 3
+    assert _progress_from_status(0.0) == 3
+    assert _progress_from_status(1.0) == 99
+
+
+def test_progress_from_status_midpoint_maps_to_poll_band() -> None:
+    assert _progress_from_status(0.5) == 51

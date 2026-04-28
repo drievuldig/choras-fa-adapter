@@ -28,12 +28,14 @@ def install_interface(
     if not method.isidentifier():
         return InstallResult(False, 2, [f"invalid method name: {method!r}"])
 
-    interface_filename = f"{method}interface.py"
+    method_upper = method.upper()
+
+    interface_filename = f"{method_upper}interface.py"
     interface_path = target / interface_filename
     init_path = target / "__init__.py"
 
     rendered = _render_interface_template(method=method)
-    import_line = f"from .{method}interface import {method}_method"
+    import_line = f"from .{method_upper}interface import {method}_method"
 
     messages.append(f"target interface file: {interface_path}")
     messages.append(f"target __init__.py: {init_path}")

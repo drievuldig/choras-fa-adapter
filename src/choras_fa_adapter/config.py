@@ -19,6 +19,7 @@ class AdapterConfig:
     poll_interval_seconds: float = 2.0
     max_polls: int = 300
     enable_capability_probe: bool = False
+    log_poll_status: bool = False
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -159,4 +160,5 @@ def load_config() -> AdapterConfig:
         poll_interval_seconds=poll_interval_seconds,
         max_polls=max_polls,
         enable_capability_probe=_env_bool("CHORAS_FA_ENABLE_CAPABILITY_PROBE", False),
+        log_poll_status=_env_bool("CHORAS_FA_LOG_POLL_STATUS", False),
     )

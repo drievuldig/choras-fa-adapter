@@ -127,12 +127,12 @@ Adapter writes CHORAS results.percentage as:
 
 - percentage = round(progress * 100)
 
-Recommended internal phase progress:
+Adapter phase progress mapping:
 
-- 0-15: parse/validate input
-- 15-30: msh conversion + material mapping
-- 30-40: FA submit
-- 40-95: poll running
+- 0-1: parse/validate input
+- 1-2: msh conversion + material mapping
+- 2-3: FA submit
+- 3-99: poll running
 - 100: completed
 
 On failure:
