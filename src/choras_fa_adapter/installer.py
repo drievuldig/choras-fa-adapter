@@ -324,7 +324,7 @@ def _render_settings_schema_payload(*, method: str) -> dict[str, object]:  # noq
                 "endAdornment": "kg/m\u00b3",
             },
             {
-                "name": "IR Length",
+                "name": "Impulse Response Length",
                 "id": "fa_ir_length_s",
                 "type": "float",
                 "display": "text",
