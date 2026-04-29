@@ -90,7 +90,7 @@ The adapter reads config from environment variables:
 - `CHORAS_FA_TOKEN_MODE` (default `auto`; one of `auto`, `access`, `pat`)
 - `CHORAS_FA_VERIFY_TLS` (default `true`)
 - `CHORAS_FA_TIMEOUT_SECONDS` (default `30`)
-- `CHORAS_FA_POLL_INTERVAL_SECONDS` (default `2`)
+- `CHORAS_FA_POLL_INTERVAL_SECONDS` (default `0.5`)
 - `CHORAS_FA_MAX_POLLS` (default `300`)
 - `CHORAS_FA_ENABLE_CAPABILITY_PROBE` (default `false`)
 - `CHORAS_FA_LOG_POLL_STATUS` (default `false`; logs each polled status/progress pair)

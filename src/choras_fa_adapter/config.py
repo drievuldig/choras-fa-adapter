@@ -142,7 +142,7 @@ def load_config() -> AdapterConfig:
 
     try:
         timeout_seconds = float(os.getenv("CHORAS_FA_TIMEOUT_SECONDS", "30"))
-        poll_interval_seconds = float(os.getenv("CHORAS_FA_POLL_INTERVAL_SECONDS", "2"))
+        poll_interval_seconds = float(os.getenv("CHORAS_FA_POLL_INTERVAL_SECONDS", "0.5"))
         max_polls = int(os.getenv("CHORAS_FA_MAX_POLLS", "300"))
     except ValueError as exc:
         raise stage_error(
