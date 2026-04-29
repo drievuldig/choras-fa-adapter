@@ -62,6 +62,10 @@ def test_set_result_with_receiver_mapping_success():
         assert responses[0]["result"]["uncorrected"] == [0.1, 0.2, 0.3]
         assert responses[1]["result"]["corrected"] == [0.25, 0.35, 0.45]
         assert responses[1]["result"]["uncorrected"] == [0.2, 0.3, 0.4]
+        assert responses[0]["receiverResults"] == [0.15, 0.25, 0.35]
+        assert responses[0]["receiverResultsUncorrected"] == [0.1, 0.2, 0.3]
+        assert responses[1]["receiverResults"] == [0.25, 0.35, 0.45]
+        assert responses[1]["receiverResultsUncorrected"] == [0.2, 0.3, 0.4]
 
         # Check that the overall result is set
         assert choras.results[0]["result"]["status"] == "completed"
@@ -112,6 +116,8 @@ def test_set_result_with_receiver_mapping_coordinate_rounding():
         # Should match due to rounding to 6 decimal places
         response = choras.results[0]["responses"][0]
         assert response["result"]["corrected"] == [0.15]
+        assert response["receiverResults"] == [0.15]
+        assert response["receiverResultsUncorrected"] == [0.1]
 
     finally:
         path.unlink()
@@ -157,14 +163,14 @@ def test_set_result_with_receiver_mapping_no_match_raises_error():
         with pytest.raises(AdapterError) as exc_info:
             choras.set_result_with_receiver_mapping(result)
         assert exc_info.value.stage == "result_mapping"
-        assert "no receivers matched" in str(exc_info.value)
+        assert "no receiver match for response" in str(exc_info.value)
 
     finally:
         path.unlink()
 
 
 def test_set_result_with_no_worker_receivers_falls_back():
-    """Test that missing worker data falls back to uniform set_result."""
+    """Test that missing worker data fails fast."""
     data = {
         "results": [
             {
@@ -190,10 +196,10 @@ def test_set_result_with_no_worker_receivers_falls_back():
             "worker": {},  # No receivers
         }
 
-        choras.set_result_with_receiver_mapping(result)
-
-        # Should fall back to uniform result setting
-        assert choras.results[0]["result"]["status"] == "completed"
+        with pytest.raises(AdapterError) as exc_info:
+            choras.set_result_with_receiver_mapping(result)
+        assert exc_info.value.stage == "result_mapping"
+        assert "receivers must be non-empty" in str(exc_info.value)
 
     finally:
         path.unlink()

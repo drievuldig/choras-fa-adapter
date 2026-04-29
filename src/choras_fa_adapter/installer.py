@@ -202,6 +202,7 @@ def {method}_method(json_path: str) -> None:
 
         try:
             save_results(str(path))
+            _write_pressure_csv(path)
         except Exception as exc:
             raise stage_error(
                 "result_export", "failed to export CHORAS result files", cause=exc
@@ -241,6 +242,37 @@ def _write_failure(path: Path, message: str) -> None:
                     item["error"]["message"] = message
 
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def _write_pressure_csv(path: Path) -> None:
+    """Write CHORAS-compatible pressure CSV next to JSON output."""
+    import pandas as pd
+
+    data = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        pressure_values = data["results"][0]["responses"][0]["receiverResults"]
+        impulse_length = float(data["simulationSettings"]["fa_ir_length_s"])
+    except (KeyError, IndexError, TypeError, ValueError) as exc:
+        raise stage_error(
+            "result_export",
+            "missing required receiverResults/fa_ir_length_s for pressure CSV",
+            cause=exc,
+        ) from exc
+
+    try:
+        pressure = [float(v) for v in pressure_values]
+    except (TypeError, ValueError) as exc:
+        raise stage_error("result_export", "pressure trace contains non-numeric values") from exc
+    if not pressure:
+        raise stage_error("result_export", "receiverResults is empty")
+    if impulse_length <= 0:
+        raise stage_error("result_export", "fa_ir_length_s must be > 0")
+
+    step = impulse_length / len(pressure)
+    t_values = [idx * step for idx in range(len(pressure))]
+    df = pd.DataFrame({{"t": t_values, "pressure": pressure}})
+    csv_path = path.with_name(path.stem + "_pressure.csv")
+    df.to_csv(csv_path, index=False)
 
 
 if __name__ == "__main__":

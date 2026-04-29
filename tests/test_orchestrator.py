@@ -79,7 +79,27 @@ def test_orchestrator_success(
     statuses = [
         FaRunStatus("queued", 0.1, None, None, "corr-1"),
         FaRunStatus("running", 0.6, None, None, "corr-1"),
-        FaRunStatus("completed", 1.0, {"ok": True}, None, "corr-1"),
+        FaRunStatus(
+            "completed",
+            1.0,
+            {
+                "mode": "local",
+                "status": "completed",
+                "worker": {
+                    "receivers": [
+                        {
+                            "x": 1.0,
+                            "y": 1.0,
+                            "z": 1.5,
+                            "corrected": [0.1, 0.2, 0.3],
+                            "uncorrected": [0.09, 0.19, 0.29],
+                        }
+                    ]
+                },
+            },
+            None,
+            "corr-1",
+        ),
     ]
 
     monkeypatch.setattr(
@@ -205,7 +225,27 @@ def test_orchestrator_logs_poll_status_when_enabled(
     statuses = [
         FaRunStatus("queued", None, None, None, "corr-1"),
         FaRunStatus("running", 0.5, None, None, "corr-1"),
-        FaRunStatus("completed", 1.0, {"ok": True}, None, "corr-1"),
+        FaRunStatus(
+            "completed",
+            1.0,
+            {
+                "mode": "local",
+                "status": "completed",
+                "worker": {
+                    "receivers": [
+                        {
+                            "x": 1.0,
+                            "y": 1.0,
+                            "z": 1.5,
+                            "corrected": [0.1, 0.2, 0.3],
+                            "uncorrected": [0.09, 0.19, 0.29],
+                        }
+                    ]
+                },
+            },
+            None,
+            "corr-1",
+        ),
     ]
 
     monkeypatch.setattr(
@@ -251,7 +291,27 @@ def test_orchestrator_uses_configured_poll_interval(
     statuses = [
         FaRunStatus("queued", None, None, None, "corr-1"),
         FaRunStatus("running", 0.5, None, None, "corr-1"),
-        FaRunStatus("completed", 1.0, {"ok": True}, None, "corr-1"),
+        FaRunStatus(
+            "completed",
+            1.0,
+            {
+                "mode": "local",
+                "status": "completed",
+                "worker": {
+                    "receivers": [
+                        {
+                            "x": 1.0,
+                            "y": 1.0,
+                            "z": 1.5,
+                            "corrected": [0.1, 0.2, 0.3],
+                            "uncorrected": [0.09, 0.19, 0.29],
+                        }
+                    ]
+                },
+            },
+            None,
+            "corr-1",
+        ),
     ]
     sleep_calls: list[float] = []
 

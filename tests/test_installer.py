@@ -66,6 +66,17 @@ def test_install_interface_writes_files(tmp_path: Path) -> None:
     assert "plot_results" in interface_text
     assert 'from simulation_backend import save_results' in interface_text
     assert 'save_results(str(path))' in interface_text
+    assert '_write_pressure_csv(path)' in interface_text
+    assert 'import pandas as pd' in interface_text
+    assert 'df.to_csv(csv_path, index=False)' in interface_text
+    assert 'pressure_values = data["results"][0]["responses"][0]["receiverResults"]' in interface_text
+    assert 'impulse_length = float(data["simulationSettings"]["fa_ir_length_s"])' in interface_text
+    assert 'step = impulse_length / len(pressure)' in interface_text
+    assert 't_values = [idx * step for idx in range(len(pressure))]' in interface_text
+    assert '"missing required receiverResults/fa_ir_length_s for pressure CSV"' in interface_text
+    assert '"receiverResults is empty"' in interface_text
+    assert '"fa_ir_length_s must be > 0"' in interface_text
+    assert 'path.stem + "_pressure.csv"' in interface_text
     assert 'raise stage_error(' in interface_text
     assert '"result_export", "failed to export CHORAS result files"' in interface_text
     assert "exampleInput_FA.json" in interface_text

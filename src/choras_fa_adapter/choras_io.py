@@ -50,12 +50,12 @@ class ChorasJson:
         For each response in each result item, matches by coordinates and
         populates with the corresponding receiver result data.
         """
-        worker = result.get("worker") or {}
-        receivers = worker.get("receivers") or []
-        if not receivers:
-            # No receiver data, fall back to setting result uniformly
-            self.set_result(result)
-            return
+        worker = result.get("worker")
+        if not isinstance(worker, dict):
+            raise stage_error("result_mapping", "result.worker must be an object")
+        receivers = worker.get("receivers")
+        if not isinstance(receivers, list) or not receivers:
+            raise stage_error("result_mapping", "result.worker.receivers must be non-empty")
 
         # Build a map of coordinates to receiver data for fast lookup
         coord_map: dict[tuple, dict[str, Any]] = {}
@@ -71,39 +71,63 @@ class ChorasJson:
 
         # Map receivers to response items
         matched_count = 0
+        expected_count = 0
         for item in self.results:
             responses = item.get("responses")
             if not isinstance(responses, list):
-                # No responses, just set result
-                item["result"] = result
-                continue
+                raise stage_error("result_mapping", "results[].responses must be a list")
+            if not responses:
+                raise stage_error("result_mapping", "results[].responses must be non-empty")
 
             for response in responses:
                 if not isinstance(response, dict):
-                    continue
+                    raise stage_error("result_mapping", "responses[] entries must be objects")
+                expected_count += 1
                 try:
                     x = float(response.get("x") or 0)
                     y = float(response.get("y") or 0)
                     z = float(response.get("z") or 0)
                     key = (round(x, 6), round(y, 6), round(z, 6))
-                    if key in coord_map:
-                        rcv_data = coord_map[key]
-                        response["result"] = {
-                            "corrected": rcv_data.get("corrected"),
-                            "uncorrected": rcv_data.get("uncorrected"),
-                        }
-                        matched_count += 1
+                    if key not in coord_map:
+                        raise stage_error(
+                            "result_mapping",
+                            f"no receiver match for response at ({x}, {y}, {z})",
+                        )
+
+                    rcv_data = coord_map[key]
+                    corrected = rcv_data.get("corrected")
+                    uncorrected = rcv_data.get("uncorrected")
+                    if not isinstance(corrected, list) or not corrected:
+                        raise stage_error(
+                            "result_mapping",
+                            "receiver corrected impulse response missing or empty",
+                        )
+                    if not isinstance(uncorrected, list) or not uncorrected:
+                        raise stage_error(
+                            "result_mapping",
+                            "receiver uncorrected impulse response missing or empty",
+                        )
+
+                    response["receiverResults"] = corrected
+                    response["receiverResultsUncorrected"] = uncorrected
+                    response["result"] = {
+                        "corrected": corrected,
+                        "uncorrected": uncorrected,
+                    }
+                    matched_count += 1
                 except (TypeError, ValueError):
-                    pass
+                    raise stage_error(
+                        "result_mapping",
+                        "response coordinates x/y/z must be numeric",
+                    )
 
             # Set overall result for the item too
             item["result"] = result
 
-        if matched_count == 0 and receivers:
+        if matched_count != expected_count:
             raise stage_error(
                 "result_mapping",
-                f"no receivers matched: {len(receivers)} available, "
-                f"0 matched to responses",
+                f"receiver mapping incomplete: {matched_count}/{expected_count} responses",
             )
 
     def set_error(self, message: str, correlation_id: str | None = None) -> None:
