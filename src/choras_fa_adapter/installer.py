@@ -187,7 +187,7 @@ import traceback
 from pathlib import Path
 
 from choras_fa_adapter.config import AdapterConfig, load_config
-from choras_fa_adapter.errors import AdapterError
+from choras_fa_adapter.errors import AdapterError, stage_error
 from choras_fa_adapter.orchestrator import run_from_choras_json
 
 
@@ -198,6 +198,14 @@ def {method}_method(json_path: str) -> None:
     try:
         config: AdapterConfig = load_config()
         run_from_choras_json(str(path), config=config)
+        from simulation_backend import save_results
+
+        try:
+            save_results(str(path))
+        except Exception as exc:
+            raise stage_error(
+                "result_export", "failed to export CHORAS result files", cause=exc
+            )
     except AdapterError as exc:
         _write_failure(path, f"{{exc.stage}}: {{exc}}")
         raise
@@ -252,7 +260,6 @@ if __name__ == "__main__":
 
     {method}_method(json_tmp_file)
 
-    save_results(json_tmp_file)
     plot_results(json_tmp_file)
 '''
 

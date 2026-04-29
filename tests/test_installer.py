@@ -64,6 +64,10 @@ def test_install_interface_writes_files(tmp_path: Path) -> None:
     assert "create_tmp_from_input" in interface_text
     assert "save_results" in interface_text
     assert "plot_results" in interface_text
+    assert 'from simulation_backend import save_results' in interface_text
+    assert 'save_results(str(path))' in interface_text
+    assert 'raise stage_error(' in interface_text
+    assert '"result_export", "failed to export CHORAS result files"' in interface_text
     assert "exampleInput_FA.json" in interface_text
     assert 'except AdapterError as exc:' in interface_text
     assert (
