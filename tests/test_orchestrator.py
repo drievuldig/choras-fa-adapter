@@ -234,6 +234,54 @@ def test_orchestrator_logs_poll_status_when_enabled(
     assert any("status=running progress=0.5" in msg for msg in messages)
 
 
+def test_orchestrator_uses_configured_poll_interval(
+    monkeypatch: pytest.MonkeyPatch,
+    valid_json: Path,
+) -> None:
+    def fake_mesh(_msh_path: str) -> list[MeshInlinePayload]:
+        return [
+            MeshInlinePayload(
+                mesh_id="mesh-0",
+                name="mesh",
+                ply_b64="ZGF0YQ==",
+                decoded_size_bytes=4,
+            )
+        ]
+
+    statuses = [
+        FaRunStatus("queued", None, None, None, "corr-1"),
+        FaRunStatus("running", 0.5, None, None, "corr-1"),
+        FaRunStatus("completed", 1.0, {"ok": True}, None, "corr-1"),
+    ]
+    sleep_calls: list[float] = []
+
+    monkeypatch.setattr(
+        "choras_fa_adapter.orchestrator.build_inline_mesh_payload", fake_mesh
+    )
+    monkeypatch.setattr(
+        "choras_fa_adapter.orchestrator.extract_required_boundaries",
+        lambda _msh_path: {"wall"},
+    )
+    monkeypatch.setattr(
+        "choras_fa_adapter.orchestrator.FaClient", lambda _cfg: FakeClient(statuses)
+    )
+    monkeypatch.setattr(
+        "choras_fa_adapter.orchestrator.time.sleep",
+        lambda seconds: sleep_calls.append(seconds),
+    )
+
+    run_from_choras_json(
+        str(valid_json),
+        config=AdapterConfig(
+            base_url="http://example",
+            token="token",
+            poll_interval_seconds=1.25,
+        ),
+    )
+
+    assert sleep_calls == [1.25, 1.25]
+
+
 def test_progress_from_status_phase_floor_and_ceiling() -> None:
     assert _progress_from_status(None) == 3
     assert _progress_from_status(0.0) == 3

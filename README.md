@@ -51,13 +51,13 @@ choras-fa-adapter run --json /path/to/input.json
 3. Install generated CHORAS interface shim:
 
 ```bash
-choras-fa-adapter install-interface --target /path/to/backend --method fa
+choras-fa-adapter install-interface --target /path/to/backend
 ```
 
 4. Install CHORAS settings-schema boilerplate for UI wiring:
 
 ```bash
-choras-fa-adapter install-settings-boilerplate --target /path/to/backend --method fa
+choras-fa-adapter install-settings-boilerplate --target /path/to/backend
 ```
 
 ## Sample Input

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 from .choras_io import load_choras_json
@@ -81,6 +82,7 @@ def run_from_choras_json(json_path: str, *, config: AdapterConfig) -> AdapterOut
                     )
                 choras.set_percentage(_progress_from_status(status.progress))
                 choras.persist()
+                time.sleep(max(0.0, config.poll_interval_seconds))
                 status = client.get_run_status(submit.run_id)
 
             correlation_id = status.correlation_id or submit.correlation_id
