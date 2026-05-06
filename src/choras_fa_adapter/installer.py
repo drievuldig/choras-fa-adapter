@@ -351,7 +351,7 @@ def _render_settings_schema_payload(*, method: str) -> dict[str, object]:  # noq
                 "type": "float",
                 "display": "text",
                 "min": 1000.0,
-                "max": 16000.0,
+                "max": 6000.0,
                 "default": 4000.0,
                 "step": 100.0,
                 "endAdornment": "Hz",

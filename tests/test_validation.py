@@ -110,7 +110,7 @@ def test_validate_input_invalid_simulation_param_type(tmp_path: Path) -> None:
         ("fa_max_gridstep_cm", 0.9),  # below min 1.0
         ("fa_max_gridstep_cm", 10.1), # above max 10
         ("fa_freq_limit_hz", 999.9),  # below min 1000
-        ("fa_freq_limit_hz", 16001.0),  # above max 16000
+        ("fa_freq_limit_hz", 6001.0),  # above max 6000
     ],
 )
 def test_validate_simulation_settings_range(
