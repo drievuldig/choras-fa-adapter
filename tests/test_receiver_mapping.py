@@ -274,6 +274,101 @@ def test_set_result_with_receiver_mapping_without_parameters_keeps_compatibility
         path.unlink()
 
 
+def test_set_result_with_receiver_mapping_missing_uncorrected_uses_fallback():
+    """Test missing uncorrected falls back to corrected with provenance marker."""
+    data = {
+        "results": [
+            {
+                "sourceX": 0.0,
+                "sourceY": 0.0,
+                "sourceZ": 0.0,
+                "responses": [
+                    {"x": 1.0, "y": 0.0, "z": 0.0},
+                ],
+            }
+        ]
+    }
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        json.dump(data, f)
+        path = Path(f.name)
+
+    try:
+        choras = ChorasJson(path, data)
+        result = {
+            "mode": "local",
+            "status": "completed",
+            "worker": {
+                "receivers": [
+                    {
+                        "x": 1.0,
+                        "y": 0.0,
+                        "z": 0.0,
+                        "corrected": [0.15, 0.25],
+                    },
+                ]
+            },
+        }
+
+        choras.set_result_with_receiver_mapping(result)
+
+        response = choras.results[0]["responses"][0]
+        assert response["receiverResults"] == [0.15, 0.25]
+        assert response["receiverResultsUncorrected"] == [0.15, 0.25]
+        assert response["result"]["uncorrected"] == [0.15, 0.25]
+        assert response["result"]["uncorrected_fallback"] == "copied_from_corrected"
+
+    finally:
+        path.unlink()
+
+
+def test_set_result_with_receiver_mapping_empty_uncorrected_uses_fallback():
+    """Test empty uncorrected list falls back to corrected with marker."""
+    data = {
+        "results": [
+            {
+                "sourceX": 0.0,
+                "sourceY": 0.0,
+                "sourceZ": 0.0,
+                "responses": [
+                    {"x": 1.0, "y": 0.0, "z": 0.0},
+                ],
+            }
+        ]
+    }
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        json.dump(data, f)
+        path = Path(f.name)
+
+    try:
+        choras = ChorasJson(path, data)
+        result = {
+            "mode": "local",
+            "status": "completed",
+            "worker": {
+                "receivers": [
+                    {
+                        "x": 1.0,
+                        "y": 0.0,
+                        "z": 0.0,
+                        "corrected": [0.15, 0.25],
+                        "uncorrected": [],
+                    },
+                ]
+            },
+        }
+
+        choras.set_result_with_receiver_mapping(result)
+
+        response = choras.results[0]["responses"][0]
+        assert response["receiverResultsUncorrected"] == [0.15, 0.25]
+        assert response["result"]["uncorrected_fallback"] == "copied_from_corrected"
+
+    finally:
+        path.unlink()
+
+
 def test_set_result_with_receiver_mapping_invalid_parameters_raises_error():
     """Test that non-object parameters fail with result mapping error."""
     data = {
@@ -316,6 +411,52 @@ def test_set_result_with_receiver_mapping_invalid_parameters_raises_error():
             choras.set_result_with_receiver_mapping(result)
         assert exc_info.value.stage == "result_mapping"
         assert "receiver parameters must be an object" in str(exc_info.value)
+
+    finally:
+        path.unlink()
+
+
+def test_set_result_with_receiver_mapping_invalid_uncorrected_raises_error():
+    """Test non-list uncorrected value fails with result mapping error."""
+    data = {
+        "results": [
+            {
+                "sourceX": 0.0,
+                "sourceY": 0.0,
+                "sourceZ": 0.0,
+                "responses": [
+                    {"x": 1.0, "y": 0.0, "z": 0.0},
+                ],
+            }
+        ]
+    }
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        json.dump(data, f)
+        path = Path(f.name)
+
+    try:
+        choras = ChorasJson(path, data)
+        result = {
+            "mode": "local",
+            "status": "completed",
+            "worker": {
+                "receivers": [
+                    {
+                        "x": 1.0,
+                        "y": 0.0,
+                        "z": 0.0,
+                        "corrected": [0.15],
+                        "uncorrected": 0,
+                    },
+                ]
+            },
+        }
+
+        with pytest.raises(AdapterError) as exc_info:
+            choras.set_result_with_receiver_mapping(result)
+        assert exc_info.value.stage == "result_mapping"
+        assert "uncorrected impulse response must be a list" in str(exc_info.value)
 
     finally:
         path.unlink()

@@ -102,10 +102,19 @@ class ChorasJson:
                             "result_mapping",
                             "receiver corrected impulse response missing or empty",
                         )
-                    if not isinstance(uncorrected, list) or not uncorrected:
+
+                    uncorrected_fallback_used = False
+                    if uncorrected is None:
+                        uncorrected = corrected
+                        uncorrected_fallback_used = True
+                    elif isinstance(uncorrected, list):
+                        if not uncorrected:
+                            uncorrected = corrected
+                            uncorrected_fallback_used = True
+                    else:
                         raise stage_error(
                             "result_mapping",
-                            "receiver uncorrected impulse response missing or empty",
+                            "receiver uncorrected impulse response must be a list when provided",
                         )
 
                     response["receiverResults"] = corrected
@@ -114,6 +123,10 @@ class ChorasJson:
                         "corrected": corrected,
                         "uncorrected": uncorrected,
                     }
+                    if uncorrected_fallback_used:
+                        response["result"]["uncorrected_fallback"] = (
+                            "copied_from_corrected"
+                        )
 
                     # Acoustic parameters are produced by FA and written back
                     # per receiver for CHORAS consumers.
