@@ -114,6 +114,17 @@ class ChorasJson:
                         "corrected": corrected,
                         "uncorrected": uncorrected,
                     }
+
+                    # Acoustic parameters are produced by FA and written back
+                    # per receiver for CHORAS consumers.
+                    parameters = rcv_data.get("parameters")
+                    if parameters is not None:
+                        if not isinstance(parameters, dict):
+                            raise stage_error(
+                                "result_mapping",
+                                "receiver parameters must be an object when provided",
+                            )
+                        response["parameters"] = parameters
                     matched_count += 1
                 except (TypeError, ValueError):
                     raise stage_error(

@@ -93,6 +93,15 @@ def test_orchestrator_success(
                             "z": 1.5,
                             "corrected": [0.1, 0.2, 0.3],
                             "uncorrected": [0.09, 0.19, 0.29],
+                            "parameters": {
+                                "edt": [0.4, 0.5, 0.6],
+                                "t20": [0.41, 0.51, 0.61],
+                                "t30": [0.42, 0.52, 0.62],
+                                "c80": [1.2, 1.3, 1.4],
+                                "d50": [0.55, 0.56, 0.57],
+                                "ts": [0.07, 0.08, 0.09],
+                                "spl_t0_freq": [65.0, 66.0, 67.0],
+                            },
                         }
                     ]
                 },
@@ -119,6 +128,11 @@ def test_orchestrator_success(
 
     final_json = json.loads(valid_json.read_text(encoding="utf-8"))
     assert final_json["results"][0]["percentage"] == 100
+    assert final_json["results"][0]["responses"][0]["parameters"]["edt"] == [
+        0.4,
+        0.5,
+        0.6,
+    ]
 
 
 def test_orchestrator_failed_status(

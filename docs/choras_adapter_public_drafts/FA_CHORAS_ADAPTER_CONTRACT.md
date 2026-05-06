@@ -122,6 +122,39 @@ Key fields consumed:
 - error: object or null
 - correlation_id
 
+## FA Result Contract (result shape expected by adapter)
+
+When status is `completed`, `result.worker.receivers` must be a non-empty list.
+Each receiver entry must include:
+
+- x, y, z: float — position, matched by adapter to CHORAS response coordinates
+- corrected: list[float] — source-corrected impulse response
+- uncorrected: list[float] — raw impulse response
+
+Each receiver entry should also include:
+
+- parameters: object — acoustic parameters, one key per metric, each value a
+  list of floats positionally aligned to the `frequencies` array in the CHORAS
+  input. Parameters are optional for backwards compatibility; when absent the
+  adapter writes no parameters field to the CHORAS response.
+
+Required parameter keys (when parameters is present):
+
+- edt: Early Decay Time (extrapolated 60 dB slope from -10 dB), in seconds
+- t20: Reverberation time from -5 to -25 dB extrapolated to 60 dB, in seconds
+- t30: Reverberation time from -5 to -35 dB extrapolated to 60 dB, in seconds
+- c80: Clarity (10 log10 of early/late energy ratio at 80 ms), in dB
+- d50: Definition (early energy fraction at 50 ms), dimensionless [0, 1]
+- ts: Centre time (energy-weighted centroid of h^2(t)), in seconds
+- spl_t0_freq: Broadband SPL per frequency band referenced to t=0, in dB
+
+Parameter values should be computed from the `corrected` IR. If a metric cannot
+be computed for a band (e.g., insufficient IR length for T30), use null for that
+position rather than omitting the key.
+
+Adapter validates that parameters, when present, is an object; any other type
+raises a result_mapping error.
+
 ## Progress and Result Mapping
 
 Adapter writes CHORAS results.percentage as:
