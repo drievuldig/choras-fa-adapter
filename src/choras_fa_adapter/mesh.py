@@ -279,10 +279,13 @@ def resolve_materials(
                 "absorption_coefficients": absorption_coefficients,
             }
         )
+    # FA requires unique mesh_id entries in mesh_bindings. For the current
+    # single-mesh flow, emit exactly one binding for mesh-0.
+    if materials:
         mesh_bindings.append(
             {
                 "mesh_id": "mesh-0",
-                "material_id": boundary,
+                "material_id": materials[0]["material_id"],
                 "source": "simulation_default",
             }
         )

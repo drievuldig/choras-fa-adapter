@@ -107,6 +107,7 @@ Constraints:
 
 - per-mesh decoded PLY size <= 5 MB
 - cumulative decoded inline geometry size <= 5 MB (current backend policy)
+- mesh_bindings entries must have unique mesh_id values (one binding per mesh)
 
 ## FA Status Contract (adapter -> FA)
 

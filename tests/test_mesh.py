@@ -95,11 +95,43 @@ def test_resolve_materials_uses_only_required_boundaries() -> None:
     )
 
     material_names = {item["name"] for item in materials}
-    bound_ids = {item["material_id"] for item in mesh_bindings}
     assert material_names == {"wall", "ceiling"}
-    assert bound_ids == {"wall", "ceiling"}
+    assert len(mesh_bindings) == 1
+    assert mesh_bindings[0]["mesh_id"] == "mesh-0"
+    assert mesh_bindings[0]["material_id"] in {"wall", "ceiling"}
     assert materials[0]["material_id"] in {"wall", "ceiling"}
     assert materials[0]["absorption_coefficients"]
+
+
+def test_resolve_materials_emits_unique_mesh_binding_for_single_mesh() -> None:
+    data = {
+        "frequencies": [125, 250, 500],
+        "absorption_coefficients": {
+            "floor": [0.1, 0.2, 0.3],
+            "wall1": [0.2, 0.3, 0.4],
+            "ceiling": [0.3, 0.4, 0.5],
+            "wall2": [0.4, 0.5, 0.6],
+            "wall3": [0.5, 0.6, 0.7],
+            "wall4": [0.6, 0.7, 0.8],
+        },
+    }
+
+    materials, mesh_bindings = resolve_materials(
+        data,
+        required_boundaries={"floor", "wall1", "ceiling", "wall2", "wall3", "wall4"},
+    )
+
+    assert len(materials) == 6
+    assert len(mesh_bindings) == 1
+    assert mesh_bindings[0]["mesh_id"] == "mesh-0"
+    assert mesh_bindings[0]["material_id"] in {
+        "floor",
+        "wall1",
+        "ceiling",
+        "wall2",
+        "wall3",
+        "wall4",
+    }
 
 
 def test_resolve_materials_drops_bands_above_16000_hz() -> None:
