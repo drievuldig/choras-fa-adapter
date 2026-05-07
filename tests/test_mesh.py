@@ -1,14 +1,32 @@
 from __future__ import annotations
 
+import base64
+
 import pytest
 from choras_fa_adapter.errors import AdapterError
-from choras_fa_adapter.mesh import extract_required_boundaries, resolve_materials
+from choras_fa_adapter.mesh import (
+    build_inline_mesh_payload,
+    extract_required_boundaries,
+    resolve_materials,
+)
 
 
 class FakeMesh:
     def __init__(self, field_data: dict, cell_data_dict: dict):
         self.field_data = field_data
         self.cell_data_dict = cell_data_dict
+
+
+class FakeCellBlock:
+    def __init__(self, cell_type: str, data: list[list[int]]):
+        self.type = cell_type
+        self.data = data
+
+
+class FakeGeometryMesh:
+    def __init__(self, points: list[list[float]], cells: list[FakeCellBlock]):
+        self.points = points
+        self.cells = cells
 
 
 def test_extract_required_boundaries_from_physical_groups(
@@ -194,3 +212,84 @@ def test_resolve_materials_rejects_bad_csv_absorption() -> None:
 
     assert exc.value.stage == "material_mapping"
     assert "invalid absorption coefficient value" in str(exc.value)
+
+
+def test_build_inline_mesh_payload_emits_valid_binary_triangle_ply(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mesh = FakeGeometryMesh(
+        points=[
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [1.0, 1.0, 0.0],
+            [0.0, 1.0, 0.0],
+        ],
+        cells=[
+            FakeCellBlock("triangle", [[0, 1, 2], [0, 2, 3]]),
+        ],
+    )
+
+    monkeypatch.setattr("choras_fa_adapter.mesh.meshio.read", lambda _path: mesh)
+
+    payload = build_inline_mesh_payload("/tmp/cube.msh")
+    assert len(payload) == 1
+    encoded = payload[0]
+    assert encoded.name == "cube.msh"
+
+    ply_bytes = base64.b64decode(encoded.ply_b64)
+    assert encoded.decoded_size_bytes == len(ply_bytes)
+
+    header_end = ply_bytes.index(b"end_header\n") + len(b"end_header\n")
+    header = ply_bytes[:header_end].decode("ascii")
+    assert "format binary_little_endian 1.0" in header
+    assert "property float x" in header
+    assert "property list uchar int vertex_indices" in header
+    assert "element vertex 4" in header
+    assert "element face 2" in header
+
+    payload_bytes = len(ply_bytes) - header_end
+    # 4 vertices * 12 bytes + 2 faces * (1 + 3*4) bytes
+    assert payload_bytes == (4 * 12) + (2 * 13)
+
+
+def test_build_inline_mesh_payload_extracts_surface_from_tetra(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mesh = FakeGeometryMesh(
+        points=[
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0],
+        ],
+        cells=[
+            FakeCellBlock("tetra", [[0, 1, 2, 3]]),
+        ],
+    )
+
+    monkeypatch.setattr("choras_fa_adapter.mesh.meshio.read", lambda _path: mesh)
+
+    payload = build_inline_mesh_payload("/tmp/tetra.msh")
+    ply_bytes = base64.b64decode(payload[0].ply_b64)
+    header_end = ply_bytes.index(b"end_header\n") + len(b"end_header\n")
+    header = ply_bytes[:header_end].decode("ascii")
+
+    assert "element vertex 4" in header
+    assert "element face 4" in header
+
+
+def test_build_inline_mesh_payload_without_surface_faces_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mesh = FakeGeometryMesh(
+        points=[[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]],
+        cells=[FakeCellBlock("line", [[0, 1]])],
+    )
+
+    monkeypatch.setattr("choras_fa_adapter.mesh.meshio.read", lambda _path: mesh)
+
+    with pytest.raises(AdapterError) as exc:
+        build_inline_mesh_payload("/tmp/line_only.msh")
+
+    assert exc.value.stage == "mesh_conversion"
+    assert "no triangle surface faces" in str(exc.value)

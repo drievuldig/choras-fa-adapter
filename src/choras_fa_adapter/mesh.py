@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import base64
 import math
+import struct
+from collections import defaultdict
 from pathlib import Path
-from tempfile import NamedTemporaryFile
 from typing import Any
 
 import meshio
+import numpy as np
 
 from .errors import stage_error
 from .models import MeshInlinePayload
@@ -206,9 +208,9 @@ def build_inline_mesh_payload(msh_path: str) -> list[MeshInlinePayload]:
         ) from exc
 
     try:
-        with NamedTemporaryFile(suffix=".ply", delete=True) as tmp:
-            meshio.write(tmp.name, mesh, file_format="ply")
-            ply_bytes = Path(tmp.name).read_bytes()
+        points, faces = _extract_surface_mesh(mesh)
+        ply_bytes = _encode_binary_triangle_ply(points, faces)
+        _validate_ply_size(ply_bytes, points_count=points.shape[0], faces_count=faces.shape[0])
     except Exception as exc:
         raise stage_error(
             "mesh_conversion", "failed converting msh to ply", cause=exc
@@ -230,6 +232,126 @@ def build_inline_mesh_payload(msh_path: str) -> list[MeshInlinePayload]:
             decoded_size_bytes=size,
         )
     ]
+
+
+def _extract_surface_mesh(mesh: Any) -> tuple[np.ndarray, np.ndarray]:
+    points_raw = getattr(mesh, "points", None)
+    if points_raw is None:
+        raise stage_error("mesh_conversion", "msh mesh has no points")
+
+    points = np.asarray(points_raw, dtype=np.float32)
+    if points.ndim != 2 or points.shape[0] == 0 or points.shape[1] < 3:
+        raise stage_error("mesh_conversion", "msh points are malformed")
+    points_xyz = points[:, :3]
+
+    cells = getattr(mesh, "cells", None)
+    if not isinstance(cells, list) or not cells:
+        raise stage_error("mesh_conversion", "msh mesh has no cells")
+
+    triangles: list[list[int]] = []
+    tetra_blocks: list[np.ndarray] = []
+
+    for cell_block in cells:
+        cell_type = getattr(cell_block, "type", "")
+        data = np.asarray(getattr(cell_block, "data", []), dtype=np.int64)
+        if data.size == 0:
+            continue
+
+        if cell_type in {"triangle", "triangle6"}:
+            if data.shape[1] < 3:
+                raise stage_error("mesh_conversion", f"malformed {cell_type} cell block")
+            triangles.extend(data[:, :3].tolist())
+            continue
+
+        if cell_type in {"quad", "quad8", "quad9"}:
+            if data.shape[1] < 4:
+                raise stage_error("mesh_conversion", f"malformed {cell_type} cell block")
+            triangles.extend(data[:, [0, 1, 2]].tolist())
+            triangles.extend(data[:, [0, 2, 3]].tolist())
+            continue
+
+        if cell_type in {"tetra", "tetra10"}:
+            if data.shape[1] < 4:
+                raise stage_error("mesh_conversion", f"malformed {cell_type} cell block")
+            tetra_blocks.append(data[:, :4])
+
+    if not triangles and tetra_blocks:
+        triangles = _extract_boundary_triangles_from_tetra(tetra_blocks)
+
+    if not triangles:
+        raise stage_error("mesh_conversion", "no triangle surface faces found in msh")
+
+    face_array = np.asarray(triangles, dtype=np.int64)
+    if face_array.ndim != 2 or face_array.shape[1] != 3:
+        raise stage_error("mesh_conversion", "surface faces are malformed")
+    if np.any(face_array < 0) or np.any(face_array >= points_xyz.shape[0]):
+        raise stage_error("mesh_conversion", "surface faces reference invalid vertex indices")
+
+    used = np.unique(face_array.reshape(-1))
+    remap = np.full(points_xyz.shape[0], -1, dtype=np.int64)
+    remap[used] = np.arange(used.shape[0], dtype=np.int64)
+
+    compact_points = points_xyz[used]
+    compact_faces = remap[face_array]
+
+    return compact_points.astype(np.float32), compact_faces.astype(np.int32)
+
+
+def _extract_boundary_triangles_from_tetra(tetra_blocks: list[np.ndarray]) -> list[list[int]]:
+    face_counts: dict[tuple[int, int, int], int] = defaultdict(int)
+    oriented_face: dict[tuple[int, int, int], tuple[int, int, int]] = {}
+
+    for tetra in tetra_blocks:
+        for a, b, c, d in tetra.tolist():
+            tet_faces = ((a, b, c), (a, d, b), (b, d, c), (a, c, d))
+            for face in tet_faces:
+                key = tuple(sorted(face))
+                face_counts[key] += 1
+                if key not in oriented_face:
+                    oriented_face[key] = face
+
+    out: list[list[int]] = []
+    for key, count in face_counts.items():
+        if count == 1:
+            out.append(list(oriented_face[key]))
+    return out
+
+
+def _encode_binary_triangle_ply(points: np.ndarray, faces: np.ndarray) -> bytes:
+    header = (
+        "ply\n"
+        "format binary_little_endian 1.0\n"
+        f"element vertex {points.shape[0]}\n"
+        "property float x\n"
+        "property float y\n"
+        "property float z\n"
+        f"element face {faces.shape[0]}\n"
+        "property list uchar int vertex_indices\n"
+        "end_header\n"
+    ).encode("ascii")
+
+    vertex_blob = np.asarray(points, dtype="<f4").tobytes(order="C")
+
+    face_blob = bytearray()
+    for i0, i1, i2 in np.asarray(faces, dtype=np.int32):
+        face_blob.extend(struct.pack("<Biii", 3, int(i0), int(i1), int(i2)))
+
+    return header + vertex_blob + bytes(face_blob)
+
+
+def _validate_ply_size(ply_bytes: bytes, *, points_count: int, faces_count: int) -> None:
+    marker = b"end_header\n"
+    header_end = ply_bytes.find(marker)
+    if header_end < 0:
+        raise stage_error("mesh_conversion", "generated PLY missing end_header marker")
+    header_bytes = header_end + len(marker)
+    expected_payload = (points_count * 12) + (faces_count * 13)
+    payload_bytes = len(ply_bytes) - header_bytes
+    if payload_bytes != expected_payload:
+        raise stage_error(
+            "mesh_conversion",
+            "generated PLY payload size does not match header declarations",
+        )
 
 
 def resolve_materials(
