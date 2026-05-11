@@ -38,25 +38,39 @@ def install_settings_boilerplate(
 
     method_upper = method.upper()
 
-    example_settings_dir = target / "example_settings"
+    sim_backend_dir = target / "simulation-backend"
+    if not sim_backend_dir.exists() or not sim_backend_dir.is_dir():
+        return InstallResult(
+            False,
+            2,
+            [
+                f"simulation backend directory not found: {sim_backend_dir}",
+                f"expected path under target: {target}/simulation-backend/",
+                "canonical container target is: --target /app",
+            ],
+        )
+
+    example_settings_dir = sim_backend_dir / "example_settings"
     schema_path = example_settings_dir / f"{method}_setting.json"
-    registry_path = (  # noqa: E501
-        target / f"{method_upper}_simulation_settings_registration.snippet.json"
+    methods_config_snippet_path = (
+        sim_backend_dir / f"{method_upper}_methods_config.snippet.json"
     )
 
     schema_payload = _render_settings_schema_payload(method=method)
-    registry_payload = _render_settings_registry_entry(method=method)
+    methods_config_payload = _render_methods_config_entry(method=method)
 
     messages.append(f"target UI schema: {schema_path}")
-    messages.append(f"target registry snippet: {registry_path}")
-    messages.append("TaskType update required in app/types/Task.py:")
-    messages.append(f'{method_upper} = "{method_upper}"')
+    messages.append(f"target methods-config snippet: {methods_config_snippet_path}")
 
     if dry_run:
         messages.append("dry-run: no files written")
         return InstallResult(True, 0, messages)
 
-    existing = [path for path in (schema_path, registry_path) if path.exists()]
+    existing = [
+        path
+        for path in (schema_path, methods_config_snippet_path)
+        if path.exists()
+    ]
     if existing and not force:
         joined = ", ".join(str(path) for path in existing)
         return InstallResult(
@@ -73,10 +87,10 @@ def install_settings_boilerplate(
         )
         messages.append(f"wrote {schema_path}")
 
-        registry_path.write_text(
-            json.dumps(registry_payload, indent=2) + "\n", encoding="utf-8"
+        methods_config_snippet_path.write_text(
+            json.dumps(methods_config_payload, indent=2) + "\n", encoding="utf-8"
         )
-        messages.append(f"wrote {registry_path}")
+        messages.append(f"wrote {methods_config_snippet_path}")
     except OSError as exc:
         err = stage_error("installer", "write failure", cause=exc)
         return InstallResult(False, 3, messages + [f"{err.stage}: {err}"])
@@ -109,26 +123,33 @@ def install_interface(
 
     method_upper = method.upper()
 
-    # The interface lives in the Python package inside the CHORAS backend:
-    #   <backend>/simulation-backend/simulation_backend/
-    sim_pkg_dir = target / "simulation-backend" / "simulation_backend"
-    if not sim_pkg_dir.exists() or not sim_pkg_dir.is_dir():
+    # The interface lives in:
+    #   <target>/simulation-backend/fa_method/fa_interface/
+    # In containerized CHORAS builds, target is typically /app.
+    sim_backend_dir = target / "simulation-backend"
+    if not sim_backend_dir.exists() or not sim_backend_dir.is_dir():
         return InstallResult(
             False,
             2,
             [
-                f"simulation package directory not found: {sim_pkg_dir}",
-                "expected layout: <backend>/simulation-backend/simulation_backend/",
+                f"simulation backend directory not found: {sim_backend_dir}",
+                f"expected path under target: {target}/simulation-backend/fa_method/fa_interface/",
+                "canonical container target is: --target /app",
             ],
         )
 
-    interface_path = sim_pkg_dir / f"{method_upper}interface.py"
-    init_path = sim_pkg_dir / "__init__.py"
+    method_pkg_dir = sim_backend_dir / "fa_method"
+    interface_pkg_dir = method_pkg_dir / "fa_interface"
+
+    interface_path = interface_pkg_dir / f"{method_upper}interface.py"
+    method_init_path = method_pkg_dir / "__init__.py"
+    init_path = interface_pkg_dir / "__init__.py"
 
     rendered = _render_interface_template(method=method)
     import_line = f"from .{method_upper}interface import {method}_method"
 
     messages.append(f"target interface file: {interface_path}")
+    messages.append(f"target package __init__.py: {method_init_path}")
     messages.append(f"target __init__.py: {init_path}")
 
     if dry_run:
@@ -144,6 +165,12 @@ def install_interface(
         )
 
     try:
+        interface_pkg_dir.mkdir(parents=True, exist_ok=True)
+
+        if not method_init_path.exists():
+            method_init_path.write_text("", encoding="utf-8")
+            messages.append(f"created {method_init_path}")
+
         interface_path.write_text(rendered, encoding="utf-8")
         messages.append(f"wrote {interface_path}")
 
@@ -183,6 +210,7 @@ def _render_interface_template(*, method: str) -> str:
 # warning: local edits may be overwritten by install-interface
 
 import json
+import os
 import traceback
 from pathlib import Path
 
@@ -197,11 +225,10 @@ def {method}_method(json_path: str) -> None:
 
     try:
         config: AdapterConfig = load_config()
-        run_from_choras_json(str(path), config=config)
-        from simulation_backend import save_results
+        outcome = run_from_choras_json(str(path), config=config)
 
         try:
-            save_results(str(path))
+            _write_success(path, status=getattr(outcome, "status", "completed"))
             _write_pressure_csv(path)
         except Exception as exc:
             raise stage_error(
@@ -217,12 +244,33 @@ def {method}_method(json_path: str) -> None:
 
 
 def main() -> None:
-    import argparse
+    json_path = os.environ.get("JSON_PATH")
+    if not json_path:
+        raise stage_error("environment", "JSON_PATH environment variable is required")
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("json_path", help="Path to CHORAS input JSON")
-    args = parser.parse_args()
-    {method}_method(args.json_path)
+    {method}_method(json_path)
+
+
+def _write_success(path: Path, *, status: str) -> None:
+    """Best-effort success writeback for CHORAS progress polling."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return
+
+    results = data.get("results")
+    if not isinstance(results, list):
+        results = []
+        data["results"] = results
+    if not results:
+        results.append({{}})
+
+    first = results[0]
+    if isinstance(first, dict):
+        first["percentage"] = 100
+        first["status"] = status
+
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
 def _write_failure(path: Path, message: str) -> None:
@@ -276,23 +324,7 @@ def _write_pressure_csv(path: Path) -> None:
 
 
 if __name__ == "__main__":
-    import os
-
-    from simulation_backend import (
-        create_tmp_from_input,
-        find_input_file_in_subfolders,
-        plot_results,
-        save_results,
-    )
-
-    json_file_name = find_input_file_in_subfolders(
-        os.path.dirname(__file__), "exampleInput_{method_upper}.json"
-    )
-    json_tmp_file = create_tmp_from_input(json_file_name)
-
-    {method}_method(json_tmp_file)
-
-    plot_results(json_tmp_file)
+    main()
 '''
 
 
@@ -360,14 +392,17 @@ def _render_settings_schema_payload(*, method: str) -> dict[str, object]:  # noq
     }
 
 
-def _render_settings_registry_entry(*, method: str) -> dict[str, object]:
-    """Return the entry to paste into simulation_settings.json."""
+def _render_methods_config_entry(*, method: str) -> dict[str, object]:
+    """Return the entry to paste into methods-config.json."""
     method_upper = method.upper()
     return {
         "description": "Finite-difference time-domain room acoustics simulation via FA",
         "label": f"Finite-Difference Time-Domain for Room Acoustics ({method_upper})",
-        "name": f"{method}_setting.json",
         "simulationType": method_upper,
+        "containerImage": f"{method}_image:latest",
+        "entryFile": f"{method}_method/{method}_interface/{method_upper}interface.py",
+        "settings": f"{method}_setting.json",
+        "envVars": {},
         "repositoryURL": "https://github.com/drievuldig/choras-fa-adapter",
         "documentationURL": "https://github.com/drievuldig/choras-fa-adapter#readme",
     }

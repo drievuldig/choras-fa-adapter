@@ -89,7 +89,7 @@ def install_settings_boilerplate_command(
     dry_run: bool,
     json_logs: bool,
 ) -> None:
-    """Install CHORAS settings schema + registration boilerplate for FA."""
+    """Install CHORAS settings schema + methods-config boilerplate for FA."""
     result = install_settings_boilerplate(
         target=target,
         method=method,

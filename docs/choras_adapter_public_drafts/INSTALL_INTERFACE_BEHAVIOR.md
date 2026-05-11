@@ -2,7 +2,7 @@
 
 ## Command
 
-choras-fa-adapter install-interface --target <simulation_backend_dir> --method fa
+choras-fa-adapter install-interface --target <target_root> --method fa
 
 ## Goal
 
@@ -11,7 +11,8 @@ that delegates to the adapter package.
 
 ## Inputs
 
-- --target: directory containing CHORAS simulation_backend package
+- --target: backend root containing simulation-backend/
+  - canonical container target: `/app`
 - --method: method name prefix for <method>interface.py (default: fa)
 - --force: overwrite without prompt
 - --dry-run: print planned changes only
@@ -21,12 +22,19 @@ that delegates to the adapter package.
 
 Output file:
 
-- <target>/<method>interface.py
+- <target>/simulation-backend/fa_method/fa_interface/<METHOD>interface.py
 
 Optional init update:
 
-- Ensure import line exists in <target>/__init__.py
-  - from .<method>interface import <method>_method
+- Ensure import line exists in
+  <target>/simulation-backend/fa_method/fa_interface/__init__.py
+  - from .<METHOD>interface import <method>_method
+
+Package scaffolding:
+
+- Create <target>/simulation-backend/fa_method/ when missing
+- Create <target>/simulation-backend/fa_method/fa_interface/ when missing
+- Create missing __init__.py files in fa_method and fa_interface
 
 ## Validation checks
 
